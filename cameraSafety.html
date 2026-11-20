@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.4.0">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.4.3">
 </head>
 <body>
 <div id="cameraSafety">
@@ -58,6 +58,11 @@
       </section>
 
       <section class="cs-box">
+        <div class="cs-box-head"><h2>警報が多い場所 TOP5</h2><span class="cs-muted">クリックで地図を拡大</span></div>
+        <ol id="hm-top" class="cs-hm-top"></ol>
+      </section>
+
+      <section class="cs-box">
         <div class="cs-box-head"><h2>種類別の件数</h2><span class="cs-muted">クリックで絞り込み</span></div>
         <div id="cs-types" class="cs-types"></div>
       </section>
@@ -66,11 +71,6 @@
         <div class="cs-box-head"><h2>日別の推移</h2><span class="cs-muted" id="cs-trend-note"></span></div>
         <div id="cs-trend" class="cs-trend"></div>
         <div class="cs-legend"><span><i class="crit"></i>重大</span><span><i class="warn"></i>注意</span><span><i class="info"></i>その他</span></div>
-      </section>
-
-      <section class="cs-box">
-        <div class="cs-box-head"><h2>警報が多い場所 TOP5</h2><span class="cs-muted">クリックで地図を拡大</span></div>
-        <ol id="hm-top" class="cs-hm-top"></ol>
       </section>
 
       <section class="cs-box">
@@ -198,6 +198,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.4.0"></script>
+<script src="cameraSafety.js?v=0.4.3"></script>
 </body>
 </html>

@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.4.0';
+  var VERSION = '0.4.3';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -908,7 +908,8 @@ geotab.addin.cameraSafety = function () {
     if (demo) return (addrCache[key] = ['東京都品川区', '東京都練馬区', '神奈川県横浜市', '愛知県名古屋市', '埼玉県さいたま市', '神奈川県川崎市', '東京都多摩市', '千葉県千葉市'][Math.abs(Math.round(pos.lat * 100 + pos.lon * 10)) % 8] + '（デモ）');
     addrCache[key] = null;
     call('GetAddresses', { coordinates: [{ x: pos.lon, y: pos.lat }] }).then(function (r) {
-      var a = r && r[0]; addrCache[key] = a ? String(a.formattedAddress || '').replace(/,?\s*(Japan|日本)\s*$/i, '').replace(/〒?\s*\d{3}-\d{4}\s*/, '') : '';
+      // 住所の先頭・末尾の「日本」と郵便番号を省く（例：「日本、愛知県名古屋市…」→「愛知県名古屋市…」）
+      var a = r && r[0]; addrCache[key] = a ? String(a.formattedAddress || '').replace(/^\s*(日本|Japan)\s*[、,]?\s*/i, '').replace(/,?\s*(Japan|日本)\s*$/i, '').replace(/〒?\s*\d{3}-\d{4}\s*/, '').trim() : '';
     }, function () { addrCache[key] = ''; }).then(function () {
       if (detailIdx >= 0) renderDetail();
       clearTimeout(hotTimer); hotTimer = setTimeout(renderHotspots, 100);
@@ -1035,22 +1036,37 @@ geotab.addin.cameraSafety = function () {
   // MyGeotabのルール画面に出てこないカメラのルール（喫煙・スマホ使用など）にもメール通知を設定するため。
   // 実行前に必ず確認を表示し、「外す」で元に戻せる。
   var ntLists = [], ntRules = [];
+  // 権限不足のエラーは、長い権限一覧ではなく短い日本語の案内にする
+  function ntErr(prefix, e) {
+    var m = String(e && e.message || e || '');
+    if (/security clearance|clearance/i.test(m)) {
+      var who = (/User\s+(\S+)\s+does not/i.exec(m) || [])[1];
+      return prefix + 'ログイン中のユーザー' + (who ? '（' + who + '）' : '') + 'には、配送リストを見る・変更する権限がありません。\n' +
+        '管理者のユーザーでMyGeotabにログインし直して操作するか、このユーザーのセキュリティクリアランスに\n' +
+        '「例外の一覧（ExceptionsList）」「配送リストの編集（EditDistributionList）」の権限を追加してください。';
+    }
+    return prefix + m.slice(0, 300);
+  }
   function ruleName(id) { var x = (allRules || []).filter(function (a) { return a.id === id; })[0]; return x ? x.name : id; }
   function ntMsg(text, cls) { var el = $('nt-msg'); el.hidden = !text; el.textContent = text || ''; el.className = 'cs-nt-msg' + (cls ? ' ' + cls : ''); }
   function ntLoad() {
     if (demo) { ntMsg('デモモードでは使えません。MyGeotabに登録してから使ってください。', 'err'); return; }
     ntMsg('読み込み中…');
     Promise.all([call('Get', { typeName: 'DistributionList' }), allRules ? Promise.resolve(allRules) : loadRules()]).then(function (r) {
-      ntLists = (r[0] || []).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ja'); });
+      // 名前が「@」で始まるリストは、MyGeotabがルール画面の通知設定で自動作成したもの。下に並べ、初期選択にしない
+      function auto(l) { return /^@/.test(l.name || ''); }
+      ntLists = (r[0] || []).sort(function (a, b) { return (auto(a) ? 1 : 0) - (auto(b) ? 1 : 0) || String(a.name).localeCompare(String(b.name), 'ja'); });
       allRules = r[1];
       ntRules = allRules.filter(function (x) { return isTarget(x) || typeOfRule(x).key === 'camera'; });
       if (!ntLists.length) { $('nt-body').hidden = true; ntMsg('配送リストがありません。先にMyGeotabの「ルール → 配布リスト」で、メールの送り先を登録した配送リストを作ってください。', 'err'); return; }
       var sel = $('nt-list'), prev = sel.value;
-      sel.innerHTML = ntLists.map(function (l) { return '<option value="' + esc(l.id) + '">' + esc(l.name || l.id) + '（送り先 ' + (l.recipients || []).length + '件）</option>'; }).join('');
+      sel.innerHTML = ntLists.map(function (l) {
+        return '<option value="' + esc(l.id) + '">' + (auto(l) ? '（ルール画面で自動作成）' : '') + esc(l.name || l.id) + '（送り先 ' + (l.recipients || []).length + '件）</option>';
+      }).join('');
       if (prev && ntLists.some(function (l) { return l.id === prev; })) sel.value = prev;
       $('nt-body').hidden = false; ntMsg('');
       ntRender(true);
-    }, function (e) { ntMsg('読み込めませんでした：' + (e && e.message || e), 'err'); });
+    }, function (e) { ntMsg(ntErr('読み込めませんでした：', e), 'err'); });
   }
   function ntCurrent() { var id = $('nt-list').value; return ntLists.filter(function (l) { return l.id === id; })[0]; }
   function ntRender(resetChecks) {
@@ -1093,7 +1109,8 @@ geotab.addin.cameraSafety = function () {
             (add ? '\n次にこの警報が起きたときに、メールが届くか確認してください。' : ''), 'ok');
         });
       }, function (e) {
-        ntMsg('保存できませんでした：' + (e && e.message || e) + '\n（このユーザーに配送リストを編集する権限がないか、このルールがメール通知に対応していない可能性があります）', 'err');
+        var m = ntErr('保存できませんでした：', e);
+        ntMsg(m + (m.indexOf('権限がありません') < 0 ? '\n（このルールがメール通知に対応していない可能性があります）' : ''), 'err');
       });
     };
   }
