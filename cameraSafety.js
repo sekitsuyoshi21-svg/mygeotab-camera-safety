@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.4.3';
+  var VERSION = '0.4.4';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -667,6 +667,7 @@ geotab.addin.cameraSafety = function () {
   function drawMap() {
     if (!data) return;
     var v = viewBox(); if (!v.W || !v.H) return;
+    hideTip();   // 描き直すと点の位置が変わるため、吹き出しは消す（マウスを動かすとまた出る）
     drawTiles(v);
     var cv = $('hm-canvas'), dpr = window.devicePixelRatio || 1;
     cv.style.transform = '';
@@ -769,14 +770,55 @@ geotab.addin.cameraSafety = function () {
     var on = document.querySelector('#cs-events tr.on'); if (on) on.classList.remove('on');
     var tr = document.querySelector('#cs-events tr[data-id="' + e.id.replace(/"/g, '') + '"]'); if (tr) tr.classList.add('on');
   }
+  // ---------- 地図の吹き出し：マウスの位置の付近（半径約22px）の警報の件数・種類・住所を表示 ----------
+  var TIP_R = 22;
+  function nearList(p) {
+    if (!$('l-points').checked && !$('l-heat').checked) return [];
+    var el = $('hm-map'), W = el.clientWidth, H = el.clientHeight;
+    return hm.screen.filter(function (s) {
+      return s.x >= 0 && s.y >= 0 && s.x <= W && s.y <= H && (s.x - p.x) * (s.x - p.x) + (s.y - p.y) * (s.y - p.y) <= TIP_R * TIP_R;
+    });
+  }
+  function hideTip() { hm.tipP = null; var t = $('hm-tip'); if (t) t.hidden = true; }
+  function updateTip(p) {
+    var tip = $('hm-tip'), near = nearList(p);
+    if (!near.length) { hideTip(); return 0; }
+    hm.tipP = p;
+    var cnt = {}, sev = {}, lat = 0, lon = 0, t0 = Infinity, t1 = 0;
+    near.forEach(function (s) {
+      var e = s.e; cnt[e.type.key] = (cnt[e.type.key] || 0) + 1; sev[e.type.sev] = (sev[e.type.sev] || 0) + 1;
+      lat += e.pos.lat; lon += e.pos.lon; if (e.t < t0) t0 = +e.t; if (e.t > t1) t1 = +e.t;
+    });
+    lat /= near.length; lon /= near.length;
+    var ad = addressOf({ lat: lat, lon: lon });
+    var keys = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; });
+    tip.innerHTML = '<div class="addr">' + esc(ad == null ? '住所を取得中…' : ad || '住所不明') + '</div>' +
+      '<div>この付近の警報 <span class="n">' + near.length + '件</span>' + (sev.crit ? '（重大 ' + sev.crit + '件）' : '') + '</div>' +
+      '<div class="tys">' + keys.slice(0, 4).map(function (k) { var t = TYPE_BY_KEY[k]; return '<span class="cs-tag ' + t.sev + '">' + esc(t.label) + ' ' + cnt[k] + '</span>'; }).join('') + (keys.length > 4 ? '<span class="sub">ほか</span>' : '') + '</div>' +
+      '<div class="sub">' + (near.length > 1 ? fmtShort(new Date(t0)) + ' 〜 ' + fmtShort(new Date(t1)) : fmtShort(new Date(t0))) + '</div>' +
+      '<div class="sub">' + lat.toFixed(5) + ', ' + lon.toFixed(5) + '・クリックで映像・詳細</div>';
+    tip.hidden = false;
+    // マウスの右下に表示。地図からはみ出す場合は左・上に出す
+    var map = $('hm-map'), W = map.clientWidth, H = map.clientHeight, tw = tip.offsetWidth, th = tip.offsetHeight;
+    var x = p.x + 16, y = p.y + 16;
+    if (x + tw > W - 8) x = p.x - tw - 16;
+    if (y + th > H - 8) y = p.y - th - 16;
+    tip.style.left = Math.max(4, x) + 'px'; tip.style.top = Math.max(4, y) + 'px';
+    return near.length;
+  }
   function bindMap() {
     var map = $('hm-map'), drag = null;
     function rel(ev) { var r = map.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; }
+    // クリックで開く警報：「警報の地点」がオンなら一番近い点、そうでなければ付近の警報（新しい順）
     function hit(p) {
-      if (!$('l-points').checked && !$('l-heat').checked) return null;
-      var best = null, bd = $('l-points').checked ? 64 : 0;
-      hm.screen.forEach(function (s) { var d = (s.x - p.x) * (s.x - p.x) + (s.y - p.y) * (s.y - p.y); if (d < bd) { bd = d; best = s; } });
-      return best;
+      var near = nearList(p); if (!near.length) return null;
+      var list = near.map(function (s) { return s.e; }).sort(function (a, b) { return b.t - a.t; }), idx = 0;
+      if ($('l-points').checked) {
+        var best = null, bd = 64;
+        near.forEach(function (s) { var d = (s.x - p.x) * (s.x - p.x) + (s.y - p.y) * (s.y - p.y); if (d < bd) { bd = d; best = s; } });
+        if (best) idx = list.indexOf(best.e); else if (!$('l-heat').checked) return null;
+      }
+      return { list: list, idx: idx };
     }
     map.addEventListener('pointerdown', function (ev) {
       if (ev.target.closest('.cs-hm-tools, .cs-hm-attr, .cs-hm-legend') || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
@@ -786,8 +828,11 @@ geotab.addin.cameraSafety = function () {
     });
     map.addEventListener('pointermove', function (ev) {
       var p = rel(ev);
-      if (!drag) { map.classList.toggle('hover', !!hit(p)); return; }
-      if (Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y) > 4) { drag.moved = true; map.classList.add('drag'); }
+      if (!drag) {
+        if (ev.target.closest('.cs-hm-tools, .cs-hm-attr, .cs-hm-legend')) { hideTip(); map.classList.remove('hover'); return; }
+        map.classList.toggle('hover', updateTip(p) > 0); return;
+      }
+      if (Math.abs(p.x - drag.x) + Math.abs(p.y - drag.y) > 4) { drag.moved = true; map.classList.add('drag'); hideTip(); }
       if (!drag.moved) return;
       hm.lon = x2lon(drag.cx - (p.x - drag.x), hm.z);
       hm.lat = y2lat(Math.max(0, Math.min(wsize(hm.z), drag.cy - (p.y - drag.y))), hm.z);
@@ -802,12 +847,13 @@ geotab.addin.cameraSafety = function () {
       var d = drag; drag = null; map.classList.remove('drag');
       if (d.moved) { drawMap(); return; }
       if (ev.type !== 'pointerup') return;
-      var s = hit(rel(ev)); if (!s) return;
-      var list = hm.screen.map(function (x) { return x.e; }).sort(function (a, b) { return b.t - a.t; });
-      openDetail(list.indexOf(s.e), list);
+      var h = hit(rel(ev)); if (!h) return;
+      hideTip();
+      openDetail(h.idx, h.list);
     }
     map.addEventListener('pointerup', end);
     map.addEventListener('pointercancel', end);
+    map.addEventListener('pointerleave', function () { if (!drag) { hideTip(); map.classList.remove('hover'); } });
     // ページのスクロールを邪魔しないよう、拡大・縮小は Ctrl＋ホイールのときだけ
     var hintTimer = null;
     map.addEventListener('wheel', function (ev) {
@@ -912,6 +958,7 @@ geotab.addin.cameraSafety = function () {
       var a = r && r[0]; addrCache[key] = a ? String(a.formattedAddress || '').replace(/^\s*(日本|Japan)\s*[、,]?\s*/i, '').replace(/,?\s*(Japan|日本)\s*$/i, '').replace(/〒?\s*\d{3}-\d{4}\s*/, '').trim() : '';
     }, function () { addrCache[key] = ''; }).then(function () {
       if (detailIdx >= 0) renderDetail();
+      if (hm.tipP) updateTip(hm.tipP);   // 吹き出しの「住所を取得中…」を住所に置き換える
       clearTimeout(hotTimer); hotTimer = setTimeout(renderHotspots, 100);
     });
     return null;
