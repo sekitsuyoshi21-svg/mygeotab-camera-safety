@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.3.4';
+  var VERSION = '0.4.0';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1002,6 +1002,7 @@ geotab.addin.cameraSafety = function () {
     draftRules = (settings.rules || []).slice();
     $('set-video-hash').value = settings.videoHash || '';
     $('set-check-out').hidden = true;
+    $('nt-body').hidden = true; ntMsg('');
     $('cs-settings').hidden = false; placeModal($('cs-settings'));
     var ready = allRules ? Promise.resolve(allRules) : demo ? Promise.resolve(demoRules()) : loadRules();
     $('set-rule-list').innerHTML = '<div class="cs-muted">読み込み中…</div>';
@@ -1030,6 +1031,73 @@ geotab.addin.cameraSafety = function () {
     settings.videoHash = ($('set-video-hash').value || '').trim();
     save('settings', settings); $('cs-settings').hidden = true; refresh();
   }
+  // ---------- メール通知：配送リスト（DistributionList）に警報のルールを結び付ける ----------
+  // MyGeotabのルール画面に出てこないカメラのルール（喫煙・スマホ使用など）にもメール通知を設定するため。
+  // 実行前に必ず確認を表示し、「外す」で元に戻せる。
+  var ntLists = [], ntRules = [];
+  function ruleName(id) { var x = (allRules || []).filter(function (a) { return a.id === id; })[0]; return x ? x.name : id; }
+  function ntMsg(text, cls) { var el = $('nt-msg'); el.hidden = !text; el.textContent = text || ''; el.className = 'cs-nt-msg' + (cls ? ' ' + cls : ''); }
+  function ntLoad() {
+    if (demo) { ntMsg('デモモードでは使えません。MyGeotabに登録してから使ってください。', 'err'); return; }
+    ntMsg('読み込み中…');
+    Promise.all([call('Get', { typeName: 'DistributionList' }), allRules ? Promise.resolve(allRules) : loadRules()]).then(function (r) {
+      ntLists = (r[0] || []).sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ja'); });
+      allRules = r[1];
+      ntRules = allRules.filter(function (x) { return isTarget(x) || typeOfRule(x).key === 'camera'; });
+      if (!ntLists.length) { $('nt-body').hidden = true; ntMsg('配送リストがありません。先にMyGeotabの「ルール → 配布リスト」で、メールの送り先を登録した配送リストを作ってください。', 'err'); return; }
+      var sel = $('nt-list'), prev = sel.value;
+      sel.innerHTML = ntLists.map(function (l) { return '<option value="' + esc(l.id) + '">' + esc(l.name || l.id) + '（送り先 ' + (l.recipients || []).length + '件）</option>'; }).join('');
+      if (prev && ntLists.some(function (l) { return l.id === prev; })) sel.value = prev;
+      $('nt-body').hidden = false; ntMsg('');
+      ntRender(true);
+    }, function (e) { ntMsg('読み込めませんでした：' + (e && e.message || e), 'err'); });
+  }
+  function ntCurrent() { var id = $('nt-list').value; return ntLists.filter(function (l) { return l.id === id; })[0]; }
+  function ntRender(resetChecks) {
+    var l = ntCurrent(); if (!l) return;
+    var linked = {}; (l.rules || []).forEach(function (r) { linked[r.id] = 1; });
+    var names = (l.rules || []).map(function (r) { return ruleName(r.id); });
+    $('nt-current').textContent = '今このリストに結び付いているルール：' + (names.length ? names.join('、') : 'なし');
+    var checked = {};
+    if (resetChecks) ntRules.forEach(function (r) { var k = typeOfRule(r).key; if (k === 'smoking' || k === 'phone') checked[r.id] = 1; });
+    else $('nt-rules').querySelectorAll('input[data-nt]').forEach(function (cb) { if (cb.checked) checked[cb.dataset.nt] = 1; });
+    var list = ntRules.slice().sort(function (a, b) { return (checked[b.id] ? 1 : 0) - (checked[a.id] ? 1 : 0) || a.name.localeCompare(b.name, 'ja'); });
+    $('nt-rules').innerHTML = list.map(function (r) {
+      return '<label><input type="checkbox" data-nt="' + esc(r.id) + '"' + (checked[r.id] ? ' checked' : '') + '> ' + esc(r.name) +
+        ' <small>→ ' + esc(typeOfRule(r).label) + (linked[r.id] ? '・<b>結び付け済み</b>' : '') + '</small></label>';
+    }).join('');
+  }
+  // 実行前の確認（ブラウザーの確認ダイアログは MyGeotab 内で出ないことがあるため、画面内に表示する）
+  function ntApply(add) {
+    var l = ntCurrent(); if (!l) return;
+    var ids = []; $('nt-rules').querySelectorAll('input[data-nt]:checked').forEach(function (cb) { ids.push(cb.dataset.nt); });
+    if (!ids.length) { ntMsg('ルールを1つ以上選んでください。', 'err'); return; }
+    var cur = (l.rules || []).map(function (r) { return r.id; });
+    var change = add ? ids.filter(function (id) { return cur.indexOf(id) < 0; }) : ids.filter(function (id) { return cur.indexOf(id) >= 0; });
+    if (!change.length) { ntMsg(add ? '選んだルールは、すでにこのリストに結び付いています。' : '選んだルールは、このリストに結び付いていません。'); return; }
+    var next = add ? cur.concat(change) : cur.filter(function (id) { return change.indexOf(id) < 0; });
+    var el = $('nt-msg'); el.hidden = false; el.className = 'cs-nt-msg';
+    el.innerHTML = '<b>配送リスト「' + esc(l.name || l.id) + '」' + (add ? 'に、次のルールを結び付けます。' : 'から、次のルールを外します。') + '</b><br>・' +
+      change.map(function (id) { return esc(ruleName(id)); }).join('<br>・') + '<br>' +
+      (add ? 'これらの警報が起きると、このリストの送り先（' + (l.recipients || []).length + '件）にメールが届くようになります。<br>' : '') +
+      '<div class="cs-row cs-nt-actions"><button type="button" class="cs-btn" id="nt-ok">実行する</button><button type="button" class="cs-btn cs-btn-ghost" id="nt-cancel">やめる</button></div>';
+    $('nt-cancel').onclick = function () { ntMsg(''); };
+    $('nt-ok').onclick = function () {
+      var ent = JSON.parse(JSON.stringify(l)); ent.rules = next.map(function (id) { return { id: id }; });
+      ntMsg('保存中…');
+      call('Set', { typeName: 'DistributionList', entity: ent }).then(function () {
+        return call('Get', { typeName: 'DistributionList', search: { id: l.id } }).then(function (r) {
+          if (r && r[0]) ntLists[ntLists.indexOf(l)] = r[0];
+          ntRender(false);
+          ntMsg((add ? '結び付けました：' : '外しました：') + change.map(ruleName).join('、') +
+            (add ? '\n次にこの警報が起きたときに、メールが届くか確認してください。' : ''), 'ok');
+        });
+      }, function (e) {
+        ntMsg('保存できませんでした：' + (e && e.message || e) + '\n（このユーザーに配送リストを編集する権限がないか、このルールがメール通知に対応していない可能性があります）', 'err');
+      });
+    };
+  }
+
   // 接続チェック：このデータベースで何が取れるかを表示（導入時の確認用）
   function runCheck() {
     var out = $('set-check-out'); out.hidden = false; out.textContent = '確認中…';
@@ -1115,6 +1183,10 @@ geotab.addin.cameraSafety = function () {
       renderRuleList((allRules || []).filter(isTarget));
     };
     $('set-check').onclick = runCheck;
+    $('nt-load').onclick = ntLoad;
+    $('nt-list').onchange = function () { ntMsg(''); ntRender(true); };
+    $('nt-add').onclick = function () { ntApply(true); };
+    $('nt-remove').onclick = function () { ntApply(false); };
     bindMap();
   }
 

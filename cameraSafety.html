@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.3.4">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.4.0">
 </head>
 <body>
 <div id="cameraSafety">
@@ -171,6 +171,22 @@
         <p class="cs-muted">MyGeotabで「ビデオ → ビデオイベント」を開いたときのアドレス欄の「#」から後ろを貼り付けると、詳細画面のボタンからその画面を開きます。</p>
       </fieldset>
       <fieldset>
+        <legend>メール通知（配送リスト）</legend>
+        <p class="cs-muted">MyGeotabの「ルール → 配布リスト」で作った配送リスト（メールの送り先）を、警報のルールに結び付けます。喫煙・スマホ使用のようにルールの画面に出てこないカメラのルールにも設定できます。</p>
+        <button type="button" id="nt-load" class="cs-btn cs-btn-ghost">配送リストを読み込む</button>
+        <div id="nt-body" hidden>
+          <label class="cs-nt-row">配送リスト <select id="nt-list"></select></label>
+          <div id="nt-current" class="cs-muted cs-nt-current"></div>
+          <div class="cs-nt-head">結び付けるルール <span class="cs-muted">（最初は喫煙・スマホ使用を選んでいます）</span></div>
+          <div id="nt-rules" class="cs-pick-list"></div>
+          <div class="cs-row cs-nt-actions">
+            <button type="button" id="nt-add" class="cs-btn">選んだルールに結び付ける</button>
+            <button type="button" id="nt-remove" class="cs-btn cs-btn-ghost">選んだルールから外す</button>
+          </div>
+        </div>
+        <div id="nt-msg" class="cs-nt-msg" hidden></div>
+      </fieldset>
+      <fieldset>
         <legend>接続チェック</legend>
         <button id="set-check" class="cs-btn cs-btn-ghost">MyGeotabのデータを確認する</button>
         <pre id="set-check-out" class="cs-check-out" hidden></pre>
@@ -182,6 +198,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.3.4"></script>
+<script src="cameraSafety.js?v=0.4.0"></script>
 </body>
 </html>
