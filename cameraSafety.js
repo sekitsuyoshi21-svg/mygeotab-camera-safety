@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.3.2';
+  var VERSION = '0.3.3';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -448,8 +448,10 @@ geotab.addin.cameraSafety = function () {
     return data.trips.reduce(function (a, t) { return a + (inGroup(t.devId, c.grp) && (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev) ? t.km : 0); }, 0);
   }
   function points(list) { return list.reduce(function (a, e) { return a + e.type.w; }, 0); }
-  // 安全スコア：100kmあたりの「重み付き警報点数」から算出（距離が短すぎる場合は50km として扱う）
-  function scoreOf(pts, km) { var r = pts / Math.max(km, 50) * 100; return Math.max(0, Math.round(100 - r * 8)); }
+  // 安全スコア：100kmあたりの「重み付き警報点数」r から算出。100 × e^(−r/20)
+  // （r=1 → 95点、r=5 → 78点、r=10 → 61点、r=20 → 37点。0点にはならず、警報が多い人どうしでも差が見える）
+  // 距離が短すぎる場合は50km として扱う
+  function scoreOf(pts, km) { var r = pts / Math.max(km, 50) * 100; return Math.round(100 * Math.exp(-r / 20)); }
   function scoreCls(s) { return s >= 80 ? 's-good' : s >= 60 ? 's-mid' : 's-bad'; }
 
   function renderFilters() {
@@ -691,26 +693,41 @@ geotab.addin.cameraSafety = function () {
       });
       ctx.globalAlpha = 1;
     }
-    // ヒートマップ：点ごとにぼかした円を重ね、重なりの濃さを色に置き換える
+    // ヒートマップ：画面を小さなマス目に分けて警報の数（重大ほど重く）を数え、ぼかしてから、
+    // 表示範囲の中で一番多い場所を赤として比べて色を付ける（警報が多くても全部が赤にならないように）
+    var PAD = 48;
     hm.screen = [];
     hm.pts.forEach(function (e) {
       var x = mercX(e.pos.lon) * v.ws - v.ox, y = mercY(e.pos.lat) * v.ws - v.oy;
-      if (x < -STAMP_R || y < -STAMP_R || x > v.W + STAMP_R || y > v.H + STAMP_R) return;
+      if (x < -PAD || y < -PAD || x > v.W + PAD || y > v.H + PAD) return;
       hm.screen.push({ x: x, y: y, e: e });
     });
     if ($('l-heat').checked && hm.screen.length) {
       heatAssets();
-      var off = document.createElement('canvas'); off.width = v.W; off.height = v.H;
-      var o = off.getContext('2d'), base = hm.pts.length > 400 ? 0.2 : 0.32;
-      hm.screen.forEach(function (s) { o.globalAlpha = Math.min(1, base * SEV_W[s.e.type.sev]); o.drawImage(stamp, s.x - STAMP_R, s.y - STAMP_R); });
-      var img2 = o.getImageData(0, 0, v.W, v.H), d = img2.data;
-      for (var i = 3; i < d.length; i += 4) {
-        var a = d[i]; if (a < 8) { d[i] = 0; continue; }
-        var pi = Math.min(255, a) * 4;
-        d[i - 3] = palette[pi]; d[i - 2] = palette[pi + 1]; d[i - 1] = palette[pi + 2]; d[i] = Math.min(230, 80 + a);
+      var CELL = 5, BL = 3, pc = Math.ceil(PAD / CELL);
+      var gw = Math.ceil(v.W / CELL) + pc * 2, gh = Math.ceil(v.H / CELL) + pc * 2, grid = new Float32Array(gw * gh), tmp = new Float32Array(gw * gh);
+      hm.screen.forEach(function (s) {
+        var i = Math.floor(s.x / CELL) + pc, j = Math.floor(s.y / CELL) + pc;
+        if (i >= 0 && j >= 0 && i < gw && j < gh) grid[j * gw + i] += SEV_W[s.e.type.sev];
+      });
+      // ぼかし（横・縦の平均を2回ずつ）
+      function blurH(a, b) { for (var y = 0; y < gh; y++) { var row = y * gw, acc = 0; for (var x = -BL; x < gw + BL; x++) { if (x + BL < gw) acc += a[row + x + BL]; if (x - BL - 1 >= 0) acc -= a[row + x - BL - 1]; if (x >= 0 && x < gw) b[row + x] = acc / (BL * 2 + 1); } } }
+      function blurV(a, b) { for (var x = 0; x < gw; x++) { var acc = 0; for (var y = -BL; y < gh + BL; y++) { if (y + BL < gh) acc += a[(y + BL) * gw + x]; if (y - BL - 1 >= 0) acc -= a[(y - BL - 1) * gw + x]; if (y >= 0 && y < gh) b[y * gw + x] = acc / (BL * 2 + 1); } } }
+      blurH(grid, tmp); blurV(tmp, grid); blurH(grid, tmp); blurV(tmp, grid);
+      var max = 0, k;
+      for (k = 0; k < grid.length; k++) if (grid[k] > max) max = grid[k];
+      if (max > 0) {
+        var small = document.createElement('canvas'); small.width = gw; small.height = gh;
+        var sc = small.getContext('2d'), img2 = sc.createImageData(gw, gh), d = img2.data;
+        for (k = 0; k < grid.length; k++) {
+          var val = grid[k] / max; if (val < 0.06) continue;      // ごく少ない所は色を付けない
+          var vv = Math.pow(val, 0.7), pi = Math.min(255, Math.round(vv * 255)) * 4, o4 = k * 4;
+          d[o4] = palette[pi]; d[o4 + 1] = palette[pi + 1]; d[o4 + 2] = palette[pi + 2]; d[o4 + 3] = Math.round(70 + vv * 160);
+        }
+        sc.putImageData(img2, 0, 0);
+        ctx.imageSmoothingEnabled = true;
+        ctx.drawImage(small, -pc * CELL, -pc * CELL, gw * CELL, gh * CELL);
       }
-      o.putImageData(img2, 0, 0);
-      ctx.drawImage(off, 0, 0, v.W, v.H);
     }
     if ($('l-points').checked) {
       hm.screen.forEach(function (s) {
