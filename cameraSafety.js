@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.4.4';
+  var VERSION = '0.4.5';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -927,7 +927,7 @@ geotab.addin.cameraSafety = function () {
     else if (e.media && e.media.id) v.innerHTML = e.media.type === 'Image' ? '<img alt="" style="width:100%;height:100%;object-fit:contain" src="' + esc(mediaUrl(e.media)) + '">'
       : '<video controls autoplay muted src="' + esc(mediaUrl(e.media)) + '"></video>';
     else v.innerHTML = '<div class="cs-d-novideo"><p>この警報の映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
-      (settings.videoHash ? '<button type="button" class="cs-btn" id="cs-d-goto">MyGeotabのビデオ画面を開く</button><p>' + esc(nameOf('device', e.devId)) + '・' + fmtT(e.t) + ' の映像を探してください</p>'
+      (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a><p>' + esc(nameOf('device', e.devId)) + '・' + fmtT(e.t) + ' の映像を探してください</p>'
         : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') + '</div>';
     // 地図
     var mp = $('cs-d-map');
@@ -946,7 +946,6 @@ geotab.addin.cameraSafety = function () {
       ['ルール名', esc(e.ruleName)], ['続いた時間', e.end ? Math.max(1, Math.round((e.end - e.t) / 1000)) + '秒' : '-']
     ].map(function (x) { return '<div><span>' + x[0] + '</span><strong>' + x[1] + '</strong></div>'; }).join('');
     $('cs-d-ack').checked = !!m.ack; $('cs-d-memo').value = m.memo || '';
-    var g = $('cs-d-goto'); if (g) g.onclick = function () { gotoVideo(e); };
   }
   function addressOf(pos) {
     var key = pos.lat.toFixed(4) + ',' + pos.lon.toFixed(4);
@@ -963,21 +962,12 @@ geotab.addin.cameraSafety = function () {
     });
     return null;
   }
-  // 「#addin-geotabvideo-events,visibleCategoryId:21」のようなアドレスを、ページ名と条件に分けて
-  // MyGeotabの同じ画面の中で移動する（state.gotoPage）。使えない場合は新しいタブで開く
-  function gotoVideo(e) {
+  // ビデオ画面のアドレス。設定の「#addin-geotabvideo-events,visibleCategoryId:21」を、
+  // MyGeotabのアドレス（https://サーバー/データベース/#…）にして新しいタブで開く。
+  // （MyGeotabの画面内移動 state.gotoPage では条件の渡し方が合わず、ビデオ画面がエラーになったため）
+  function videoUrl() {
     var h = String(settings.videoHash || '').replace(/^.*#/, '').trim();
-    if (!h) return;
-    var parts = h.split(','), page = parts.shift(), args = {};
-    parts.forEach(function (p) {
-      var i = p.indexOf(':'); if (i < 0) return;
-      var k = p.slice(0, i), v = p.slice(i + 1);
-      args[k] = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
-    });
-    if (state && state.gotoPage) {
-      try { closeDetail(); state.gotoPage(page, Object.keys(args).length ? args : undefined); return; } catch (err) { /* 新しいタブで開く */ }
-    }
-    window.open('https://' + server + '/' + (session ? session.database : '') + '/#' + h, '_blank');
+    return 'https://' + (server || 'my.geotab.com') + '/' + encodeURIComponent(session ? session.database : '') + '/#' + h;
   }
 
   // デモ用の映像の代わり（ドラレコ風のイラスト）
@@ -1260,7 +1250,8 @@ geotab.addin.cameraSafety = function () {
     var badge = $('cs-source'); badge.textContent = (demo ? 'デモ' : 'ライブ') + ' v' + VERSION; badge.className = 'cs-badge' + (demo ? ' demo' : '');
     var ready = demo ? Promise.resolve() : new Promise(function (res) {
       api.getSession(function (s, srv) {
-        session = s; server = srv || window.location.hostname || 'my.geotab.com';
+        // Add-Inは別のサイト（github.io）から読み込まれるため、自分のアドレスではなくMyGeotabのサーバー名を使う
+        session = s; server = srv || 'my.geotab.com';
         storageKey = 'cameraSafety:' + s.database; res();
       });
     });
