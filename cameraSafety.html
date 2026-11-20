@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>安全運転ダッシュボード</title>
+  <link rel="stylesheet" href="cameraSafety.css?v=0.1.0">
+</head>
+<body>
+<div id="cameraSafety">
+  <header class="cs-header">
+    <div class="cs-title">
+      <h1>安全運転ダッシュボード</h1>
+      <span id="cs-source" class="cs-badge">-</span>
+    </div>
+    <div class="cs-controls">
+      <label>期間
+        <select id="cs-days">
+          <option value="1">今日</option>
+          <option value="-1">昨日</option>
+          <option value="7">直近7日</option>
+          <option value="30" selected>直近30日</option>
+          <option value="90">直近90日</option>
+        </select>
+      </label>
+      <button id="cs-refresh" class="cs-btn">更新</button>
+      <button id="cs-open-settings" class="cs-btn cs-btn-ghost">設定</button>
+    </div>
+  </header>
+
+  <div id="cs-message" class="cs-message" hidden></div>
+
+  <section class="cs-kpis">
+    <div class="cs-kpi"><span>警報の合計</span><strong id="kpi-total">-</strong><small id="kpi-total-sub"></small></div>
+    <div class="cs-kpi"><span>100kmあたり</span><strong id="kpi-rate">-</strong><small id="kpi-rate-sub"></small></div>
+    <div class="cs-kpi crit"><span>重大な警報</span><strong id="kpi-crit">-</strong><small>衝突・スマホ・脇見など</small></div>
+    <div class="cs-kpi score"><span>平均の安全スコア</span><strong id="kpi-score">-</strong><small>100点満点</small></div>
+    <div class="cs-kpi todo"><span>未確認</span><strong id="kpi-todo">-</strong><small>確認済みの印がない警報</small></div>
+  </section>
+
+  <section class="cs-row2">
+    <div class="cs-card">
+      <div class="cs-card-head"><h2>種類別の件数</h2><span class="cs-muted">クリックで一覧を絞り込み</span></div>
+      <div id="cs-types" class="cs-types"></div>
+    </div>
+    <div class="cs-card">
+      <div class="cs-card-head"><h2>日別の推移</h2><span class="cs-muted" id="cs-trend-note"></span></div>
+      <div id="cs-trend" class="cs-trend"></div>
+      <div class="cs-legend"><span><i class="crit"></i>重大</span><span><i class="warn"></i>注意</span><span><i class="info"></i>その他</span></div>
+    </div>
+  </section>
+
+  <section class="cs-card">
+    <div class="cs-card-head">
+      <h2>安全スコア ランキング</h2>
+      <span class="cs-head-right">
+        <span class="cs-seg" id="cs-rank-by">
+          <button data-by="driver" class="on">運転手別</button><button data-by="device">車両別</button>
+        </span>
+        <span class="cs-muted">点数が低い順・クリックで一覧を絞り込み</span>
+      </span>
+    </div>
+    <div class="cs-table-wrap">
+      <table class="cs-table">
+        <thead><tr><th>順位</th><th id="cs-rank-name">運転手</th><th>安全スコア</th><th class="r">走行距離</th><th class="r">警報</th><th class="r">100kmあたり</th><th>多い警報</th></tr></thead>
+        <tbody id="cs-rank"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="cs-card">
+    <div class="cs-card-head">
+      <h2>警報一覧 <span id="cs-list-count" class="cs-muted"></span></h2>
+      <span class="cs-head-right">
+        <span id="cs-chips" class="cs-chips"></span>
+        <label class="cs-check"><input type="checkbox" id="cs-only-todo"> 未確認だけ</label>
+        <input type="search" id="cs-filter" placeholder="運転手・車両で絞り込み">
+        <button id="cs-csv" class="cs-btn cs-btn-ghost">CSV出力</button>
+      </span>
+    </div>
+    <div class="cs-table-wrap cs-list-wrap">
+      <table class="cs-table cs-list">
+        <thead><tr><th>確認</th><th>日時</th><th>種類</th><th>運転手</th><th>車両</th><th class="r">速度</th><th>映像</th></tr></thead>
+        <tbody id="cs-events"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 警報の詳細（映像・地図） -->
+  <div id="cs-detail" class="cs-modal" hidden>
+    <div class="cs-modal-body cs-detail-body">
+      <div class="cs-card-head">
+        <h2 id="cs-d-title">警報の詳細</h2>
+        <span class="cs-head-right">
+          <button id="cs-d-prev" class="cs-btn cs-btn-ghost cs-btn-sm" title="前の警報（←キー）">◀ 前</button>
+          <button id="cs-d-next" class="cs-btn cs-btn-ghost cs-btn-sm" title="次の警報（→キー）">次 ▶</button>
+          <button id="cs-d-close" class="cs-btn cs-btn-sm" title="閉じる（Esc）">閉じる</button>
+        </span>
+      </div>
+      <div class="cs-d-grid">
+        <div class="cs-d-video" id="cs-d-video"></div>
+        <div class="cs-d-map" id="cs-d-map"></div>
+      </div>
+      <div class="cs-d-info" id="cs-d-info"></div>
+      <div class="cs-d-actions">
+        <label class="cs-check cs-d-ack"><input type="checkbox" id="cs-d-ack"> 確認済みにする</label>
+        <input type="text" id="cs-d-memo" placeholder="メモ（指導内容など）">
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定 -->
+  <div id="cs-settings" class="cs-modal" hidden>
+    <div class="cs-modal-body">
+      <h2>設定</h2>
+      <fieldset>
+        <legend>対象の警報（MyGeotabのルール）</legend>
+        <div class="cs-row">
+          <input type="search" id="set-rule-query" placeholder="例: 急ブレーキ, 脇見, Distraction">
+          <button id="set-rule-search" class="cs-btn">検索</button>
+          <button id="set-rule-auto" class="cs-btn cs-btn-ghost">自動で選び直す</button>
+        </div>
+        <p class="cs-muted">GO Focus Plusの警報（脇見・スマホ使用・車間距離など）と、急ブレーキ・急加速などのルールを選んでください。チェックしたルールの例外イベントを集計します。</p>
+        <div id="set-rule-list" class="cs-pick-list"></div>
+      </fieldset>
+      <fieldset>
+        <legend>映像を開くページ</legend>
+        <label>MyGeotabのビデオ画面のURL（「#」以降）
+          <input type="text" id="set-video-hash" placeholder="例: #videoEvents">
+        </label>
+        <p class="cs-muted">MyGeotabで「ビデオ → ビデオイベント」を開いたときのアドレス欄の「#」から後ろを貼り付けると、一覧の「映像」ボタンからその画面を開きます。</p>
+      </fieldset>
+      <fieldset>
+        <legend>接続チェック</legend>
+        <button id="set-check" class="cs-btn cs-btn-ghost">MyGeotabのデータを確認する</button>
+        <pre id="set-check-out" class="cs-check-out" hidden></pre>
+      </fieldset>
+      <div class="cs-modal-actions">
+        <button id="set-cancel" class="cs-btn cs-btn-ghost">キャンセル</button>
+        <button id="set-save" class="cs-btn">保存して更新</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="cameraSafety.js?v=0.1.0"></script>
+</body>
+</html>
