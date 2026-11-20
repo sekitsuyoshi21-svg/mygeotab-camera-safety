@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.3.3';
+  var VERSION = '0.3.4';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -46,6 +46,7 @@ geotab.addin.cameraSafety = function () {
 
   var api = null, state = null, demo = false, storageKey = 'cameraSafety:demo', server = '', session = null;
   var settings = { rules: null, videoHash: '' };   // rules: [{id, name}] / null=未設定（自動選択）
+  var DEFAULT_VIDEO_HASH = '#addin-geotabvideo-events,visibleCategoryId:21';
   var marks = {};                                   // 確認済み・メモ { eventId: {ack, memo} }
   var data = null, loading = false;
   var view = { rankBy: 'driver', onlyTodo: false };
@@ -914,11 +915,20 @@ geotab.addin.cameraSafety = function () {
     });
     return null;
   }
+  // 「#addin-geotabvideo-events,visibleCategoryId:21」のようなアドレスを、ページ名と条件に分けて
+  // MyGeotabの同じ画面の中で移動する（state.gotoPage）。使えない場合は新しいタブで開く
   function gotoVideo(e) {
-    var h = String(settings.videoHash || '').replace(/^.*#/, '');
+    var h = String(settings.videoHash || '').replace(/^.*#/, '').trim();
     if (!h) return;
-    var page = h.split(',')[0];
-    if (state && state.gotoPage && h.indexOf(',') < 0) { closeDetail(); state.gotoPage(page); return; }
+    var parts = h.split(','), page = parts.shift(), args = {};
+    parts.forEach(function (p) {
+      var i = p.indexOf(':'); if (i < 0) return;
+      var k = p.slice(0, i), v = p.slice(i + 1);
+      args[k] = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
+    });
+    if (state && state.gotoPage) {
+      try { closeDetail(); state.gotoPage(page, Object.keys(args).length ? args : undefined); return; } catch (err) { /* 新しいタブで開く */ }
+    }
     window.open('https://' + server + '/' + (session ? session.database : '') + '/#' + h, '_blank');
   }
 
@@ -1120,6 +1130,8 @@ geotab.addin.cameraSafety = function () {
     });
     return ready.then(function () {
       settings = Object.assign({ rules: null, videoHash: '' }, load('settings', {}));
+      // ビデオ画面：Geotab標準のビデオ（GO Focus）画面を初期設定にする（「設定」で変更可）
+      if (!settings.videoHash) settings.videoHash = DEFAULT_VIDEO_HASH;
       marks = load('marks', {});
       var d = load('days', null); if (d) $('cs-days').value = d;
       savedGroup = load('group', '') || null;
