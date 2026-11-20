@@ -11,11 +11,13 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.3.0';
+  var VERSION = '0.3.2';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
   var TYPES = [
+    // カメラ機器の状態（遮られている・カバーが外れた・向きの調整が必要など）。運転の危険ではないため初期設定では集計しない
+    { key: 'camera', label: 'カメラの状態', sev: 'info', w: 0, re: /obstruct|cover\s*removed|adjustment\s*required|camera\s*(blocked|covered|tamper)|遮|調整が必要/i },
     { key: 'near', label: '衝突警告', sev: 'crit', w: 5, re: /near\s*collision|forward\s*collision|ニア.*衝突|衝突.*(警告|寸前|回避|注意)|前方衝突/i },
     { key: 'collision', label: '衝突検知', sev: 'crit', w: 8, re: /collision|crash|accident|衝突|事故|衝撃/i },
     { key: 'phone', label: 'スマホ使用', sev: 'crit', w: 5, re: /phone|cell|携帯|スマホ|通話/i },
@@ -65,7 +67,12 @@ geotab.addin.cameraSafety = function () {
     for (var i = 0; i < TYPES.length; i++) if (TYPES[i].re.test(n)) return TYPES[i];
     return OTHER;
   }
-  function isTarget(rule) { return !!KNOWN_RULES[rule.id] || typeOfRule(rule) !== OTHER || CAMERA_RE.test(rule.name || ''); }
+  function isTarget(rule) {
+    var t = typeOfRule(rule);
+    if (t.key === 'camera') return false;
+    return !!KNOWN_RULES[rule.id] || t !== OTHER || CAMERA_RE.test(rule.name || '');
+  }
+  var AUTO_VER = 2;   // 自動選択の基準を変えたら上げる（利用者が設定で選んでいない場合は選び直す）
   function load(key, def) { try { var v = JSON.parse(localStorage.getItem(storageKey + ':' + key)); return v == null ? def : v; } catch (e) { return def; } }
   function save(key, v) { try { localStorage.setItem(storageKey + ':' + key, JSON.stringify(v)); } catch (e) { /* ignore */ } }
   // 地図の座標（Webメルカトル、0〜1に正規化）
@@ -94,8 +101,9 @@ geotab.addin.cameraSafety = function () {
     var p = period();
     return loadRules().then(function (rules) {
       var ruleById = {}; rules.forEach(function (r) { ruleById[r.id] = r; });
-      if (!settings.rules) {                     // 初回は自動選択
+      if (!settings.rules || (!settings.manual && settings.autoVer !== AUTO_VER)) {   // 初回（または自動選択の基準が変わったとき）は自動選択
         settings.rules = rules.filter(isTarget).map(function (r) { return { id: r.id, name: r.name }; });
+        settings.autoVer = AUTO_VER;
         save('settings', settings);
       }
       var sel = settings.rules.filter(function (r) { return ruleById[r.id]; });
@@ -104,15 +112,16 @@ geotab.addin.cameraSafety = function () {
       var calls = [
         ['Get', { typeName: 'Device', search: groups && groups.length ? { groups: groups } : {}, resultsLimit: 5000 }],
         ['Get', { typeName: 'User', search: { isDriver: true }, resultsLimit: 5000 }],
-        ['Get', { typeName: 'Trip', search: { fromDate: p.from.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 50000 }]
+        ['Get', { typeName: 'Trip', search: { fromDate: p.from.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 50000 }],
+        ['Get', { typeName: 'Group', resultsLimit: 10000 }]
       ];
       sel.forEach(function (r) {
         calls.push(['Get', { typeName: 'ExceptionEvent', search: { ruleSearch: { id: r.id }, fromDate: p.prevFrom.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 50000 }]);
       });
       return Promise.all([multi(calls), loadMedia(p)]).then(function (res) {
         var r = res[0], media = res[1];
-        var devices = {}, drivers = {}, trips = [];
-        r[0].forEach(function (d) { devices[d.id] = d.name || d.id; });
+        var devices = {}, drivers = {}, trips = [], devRaw = {};
+        r[0].forEach(function (d) { devices[d.id] = d.name || d.id; devRaw[d.id] = (d.groups || []).map(function (g) { return g.id; }); });
         r[1].forEach(function (u) { drivers[u.id] = ((u.lastName || '') + ' ' + (u.firstName || '')).trim() || u.name || u.id; });
         r[2].forEach(function (t) {
           var dv = t.device && t.device.id; if (!devices[dv]) return;
@@ -121,16 +130,37 @@ geotab.addin.cameraSafety = function () {
         var events = [];
         sel.forEach(function (rule, i) {
           var type = typeOfRule(ruleById[rule.id]);
-          (r[3 + i] || []).forEach(function (x) {
+          (r[4 + i] || []).forEach(function (x) {
             var dv = x.device && x.device.id; if (!devices[dv]) return;
             events.push({ id: x.id, t: new Date(x.activeFrom), end: x.activeTo ? new Date(x.activeTo) : null, devId: dv,
               drvId: driverId(x.driver), type: type, ruleName: ruleById[rule.id].name, pos: undefined });
           });
         });
+        events = dedupe(events);
         attachMedia(events, media);
-        return build(events, devices, drivers, trips, p);
+        var d = build(events, devices, drivers, trips, p);
+        setGroups(d, (r[3] || []).map(function (g) { return { id: g.id, name: g.name, children: (g.children || []).map(function (c) { return c.id; }) }; }), devRaw);
+        return d;
       });
     });
+  }
+
+  // 同じ出来事が新旧・複数のルールで重ねて記録される場合（例：Harsh Braking と Harsh Braking (New)）、
+  // 同じ車両・同じ種類で15秒以内の警報は1件にまとめる（ルール名は「／」でつなぐ）
+  var DEDUPE_MS = 15000;
+  function dedupe(events) {
+    events.sort(function (a, b) { return a.devId < b.devId ? -1 : a.devId > b.devId ? 1 : a.type.key < b.type.key ? -1 : a.type.key > b.type.key ? 1 : a.t - b.t; });
+    var out = [], last = null;
+    events.forEach(function (e) {
+      if (last && last.devId === e.devId && last.type === e.type && e.t - last.t <= DEDUPE_MS) {
+        if (last.ruleName.indexOf(e.ruleName) < 0) last.ruleName += '／' + e.ruleName;
+        if (e.end && (!last.end || e.end > last.end)) last.end = e.end;
+        if (last.drvId === UNKNOWN_DRIVER) last.drvId = e.drvId;
+        return;
+      }
+      out.push(e); last = e;
+    });
+    return out;
   }
 
   // MediaFile（映像ファイル）。GO Focus Plusでは使われないことが多いため、取れなくても続行する。
@@ -342,14 +372,52 @@ geotab.addin.cameraSafety = function () {
     }
     var d = build(events, devices, drivers, trips, p);
     d.tracks = tracks; d.trk = { done: 1, total: 1, loading: false };
+    // デモ用のグループ（関東エリアの下に営業所）
+    setGroups(d, [
+      { id: 'g-kanto', name: '関東エリア', children: ['g-tokyo', 'g-kanagawa', 'g-saitama'] },
+      { id: 'g-tokyo', name: '東京営業所', children: [] },
+      { id: 'g-kanagawa', name: '神奈川営業所', children: [] },
+      { id: 'g-saitama', name: '埼玉・千葉営業所', children: [] },
+      { id: 'g-nagoya', name: '名古屋営業所', children: [] }
+    ], { b0: ['g-tokyo'], b1: ['g-tokyo'], b2: ['g-tokyo'], b3: ['g-tokyo'], b9: ['g-kanagawa'], b10: ['g-tokyo'],
+      b4: ['g-kanagawa'], b5: ['g-kanagawa'], b6: ['g-nagoya'], b7: ['g-nagoya'], b8: ['g-saitama'], b11: ['g-saitama'] });
     return Promise.resolve(d);
   }
+
+  // グループ：MyGeotabのグループ（営業所など）。上位のグループを選んだ場合は、その下のグループの車両も含める。
+  // 「GroupCompanyId」などGeotab標準の仕組み用グループは選択肢に出さない。
+  function setGroups(d, list, devRaw) {
+    var byId = {}, parent = {};
+    list.forEach(function (g) { byId[g.id] = g; });
+    list.forEach(function (g) { g.children.forEach(function (c) { parent[c] = g.id; }); });
+    var devGroups = {}, count = {};
+    Object.keys(devRaw).forEach(function (dv) {
+      var set = {};
+      devRaw[dv].forEach(function (gid) { for (var g = gid, k = 0; g && k < 30; g = parent[g], k++) set[g] = 1; });
+      devGroups[dv] = set;
+      Object.keys(set).forEach(function (g) { count[g] = (count[g] || 0) + 1; });
+    });
+    var builtin = /^Group\w*Id$/;
+    var opts = [];
+    function walk(gid, depth) {
+      var g = byId[gid]; if (!g) return;
+      var show = !builtin.test(gid) && count[gid];
+      if (show) opts.push({ id: gid, name: g.name || gid, depth: depth, n: count[gid] });
+      g.children.map(function (c) { return byId[c]; }).filter(Boolean)
+        .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ja'); })
+        .forEach(function (c) { walk(c.id, show ? depth + 1 : depth); });
+    }
+    list.filter(function (g) { return !parent[g.id]; }).forEach(function (g) { walk(g.id, 0); });
+    d.groups = opts; d.devGroups = devGroups;
+  }
+  var savedGroup = null;
+  function inGroup(devId, gid) { return !gid || !!((data.devGroups || {})[devId] || {})[gid]; }
 
   function build(events, devices, drivers, trips, p) {
     var cur = events.filter(function (e) { return e.t >= p.from && e.t <= p.to; });
     var prev = events.filter(function (e) { return e.t >= p.prevFrom && e.t < p.from; });
     cur.sort(function (a, b) { return b.t - a.t; });
-    return { events: cur, prevEvents: prev, devices: devices, drivers: drivers, trips: trips, tracks: [], trk: null, p: p };
+    return { events: cur, prevEvents: prev, devices: devices, drivers: drivers, trips: trips, tracks: [], trk: null, p: p, groups: [], devGroups: {} };
   }
 
   // ---------- 絞り込み ----------
@@ -357,16 +425,17 @@ geotab.addin.cameraSafety = function () {
     if (by === 'driver') return id === UNKNOWN_DRIVER ? '（運転手未登録）' : data.drivers[id] || id;
     return data.devices[id] || id;
   }
-  function f() { return { drv: $('f-driver').value, dev: $('f-device').value, type: $('f-type').value }; }
+  function f() { return { grp: $('f-group').value, drv: $('f-driver').value, dev: $('f-device').value, type: $('f-type').value }; }
   function typeOk(e, ty) {
     if (ty === '_crit') return e.type.sev === 'crit';
     if (ty === '_noinfo') return e.type.sev !== 'info';
     return !ty || e.type.key === ty;
   }
-  // opts.noType: 種類の条件を外す / opts.noWho: ドライバー・車両の条件を外す / opts.list: 一覧の条件（未確認だけ・検索）も使う
+  // opts.noType: 種類の条件を外す / opts.noWho: ドライバー・車両の条件を外す（グループの条件は残す） / opts.list: 一覧の条件（未確認だけ・検索）も使う
   function filtered(opts, src) {
     opts = opts || {}; var c = f(), q = opts.list ? ($('cs-filter').value || '').trim() : '';
     return (src || data.events).filter(function (e) {
+      if (c.grp && !inGroup(e.devId, c.grp)) return false;
       if (!opts.noWho && c.drv && e.drvId !== c.drv) return false;
       if (!opts.noWho && c.dev && e.devId !== c.dev) return false;
       if (!opts.noType && !typeOk(e, c.type)) return false;
@@ -376,7 +445,7 @@ geotab.addin.cameraSafety = function () {
     });
   }
   function kmOf(c) {
-    return data.trips.reduce(function (a, t) { return a + ((!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev) ? t.km : 0); }, 0);
+    return data.trips.reduce(function (a, t) { return a + (inGroup(t.devId, c.grp) && (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev) ? t.km : 0); }, 0);
   }
   function points(list) { return list.reduce(function (a, e) { return a + e.type.w; }, 0); }
   // 安全スコア：100kmあたりの「重み付き警報点数」から算出（距離が短すぎる場合は50km として扱う）
@@ -384,9 +453,19 @@ geotab.addin.cameraSafety = function () {
   function scoreCls(s) { return s >= 80 ? 's-good' : s >= 60 ? 's-mid' : 's-bad'; }
 
   function renderFilters() {
-    var dSel = $('f-driver'), vSel = $('f-device'), tSel = $('f-type'), c = f(), drvs = {}, devs = {}, cnt = {};
-    data.trips.forEach(function (t) { drvs[t.drvId] = drvs[t.drvId] || 0; devs[t.devId] = devs[t.devId] || 0; });
-    data.events.forEach(function (e) { drvs[e.drvId] = (drvs[e.drvId] || 0) + 1; devs[e.devId] = (devs[e.devId] || 0) + 1; cnt[e.type.key] = (cnt[e.type.key] || 0) + 1; });
+    var gSel = $('f-group'), dSel = $('f-driver'), vSel = $('f-device'), tSel = $('f-type'), c = f(), drvs = {}, devs = {}, cnt = {};
+    // グループ（階層は字下げで表示）。前回選んだグループを最初に復元
+    var gids = {};
+    if (savedGroup != null) { c.grp = savedGroup; savedGroup = null; }
+    gSel.innerHTML = '<option value="">すべてのグループ</option>' + (data.groups || []).map(function (g) {
+      gids[g.id] = 1;
+      return '<option value="' + esc(g.id) + '">' + new Array(g.depth + 1).join('　') + esc(g.name) + '（' + g.n + '台）</option>';
+    }).join('');
+    gSel.value = gids[c.grp] ? c.grp : ''; c.grp = gSel.value;
+    gSel.disabled = !(data.groups || []).length;
+    // ドライバー・車両の選択肢は、選んだグループの車両に関係するものだけ
+    data.trips.forEach(function (t) { if (!inGroup(t.devId, c.grp)) return; drvs[t.drvId] = drvs[t.drvId] || 0; devs[t.devId] = devs[t.devId] || 0; });
+    data.events.forEach(function (e) { if (!inGroup(e.devId, c.grp)) return; drvs[e.drvId] = (drvs[e.drvId] || 0) + 1; devs[e.devId] = (devs[e.devId] || 0) + 1; cnt[e.type.key] = (cnt[e.type.key] || 0) + 1; });
     function opts(map, by, all) {
       return '<option value="">' + all + '</option>' + Object.keys(map).sort(function (a, b) { return nameOf(by, a).localeCompare(nameOf(by, b), 'ja'); })
         .map(function (id) { return '<option value="' + esc(id) + '">' + esc(nameOf(by, id)) + '（' + map[id] + '件）</option>'; }).join('');
@@ -399,7 +478,7 @@ geotab.addin.cameraSafety = function () {
     tSel.value = c.type === '' || c.type.charAt(0) === '_' || cnt[c.type] ? c.type : '';
     markFilters();
   }
-  function markFilters() { ['f-driver', 'f-device', 'f-type'].forEach(function (id) { $(id).classList.toggle('on', !!$(id).value); }); }
+  function markFilters() { ['f-group', 'f-driver', 'f-device', 'f-type'].forEach(function (id) { $(id).classList.toggle('on', !!$(id).value); }); }
   function setFilter(id, value) { var el = $(id); el.value = el.value === value ? '' : value; if (el.value !== value && el.value !== '') el.value = ''; markFilters(); filterChanged(); }
   function filterChanged() { hm.userMoved = false; render(); fitMap(); requestDraw(); }
 
@@ -424,7 +503,7 @@ geotab.addin.cameraSafety = function () {
     $('kpi-score').textContent = rows.length ? Math.round(rows.reduce(function (a, r) { return a + r.score; }, 0) / rows.length) + '点' : '-';
     $('kpi-todo').textContent = ev.filter(function (e) { return !(marks[e.id] || {}).ack; }).length + '件';
     $('kpi-km').textContent = Math.round(km).toLocaleString() + 'km';
-    var nd = {}; data.trips.forEach(function (t) { if ((!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev)) nd[t.devId] = 1; });
+    var nd = {}; data.trips.forEach(function (t) { if (inGroup(t.devId, c.grp) && (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev)) nd[t.devId] = 1; });
     $('kpi-km-sub').textContent = Object.keys(nd).length + '台';
   }
 
@@ -471,7 +550,8 @@ geotab.addin.cameraSafety = function () {
   function rankRows(by) {
     var groups = {}, km = {};
     filtered({ noWho: true }).forEach(function (e) { var id = by === 'driver' ? e.drvId : e.devId; (groups[id] = groups[id] || []).push(e); });
-    data.trips.forEach(function (t) { var id = by === 'driver' ? t.drvId : t.devId; km[id] = (km[id] || 0) + t.km; });
+    var g = f().grp;
+    data.trips.forEach(function (t) { if (!inGroup(t.devId, g)) return; var id = by === 'driver' ? t.drvId : t.devId; km[id] = (km[id] || 0) + t.km; });
     var ids = Object.keys(groups);
     Object.keys(km).forEach(function (id) { if (!groups[id] && km[id] > 1) ids.push(id); });
     return ids.map(function (id) {
@@ -519,7 +599,7 @@ geotab.addin.cameraSafety = function () {
   function mapTracks() {
     if (!data || !data.tracks) return [];
     var c = f();
-    return data.tracks.filter(function (t) { return (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev); });
+    return data.tracks.filter(function (t) { return inGroup(t.devId, c.grp) && (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev); });
   }
   function renderMapSide() {
     if (!data) return;
@@ -919,7 +999,7 @@ geotab.addin.cameraSafety = function () {
   }
   function saveSettingsForm() {
     syncDraft();
-    if (!demo) settings.rules = draftRules;
+    if (!demo) { settings.rules = draftRules; settings.manual = true; }
     settings.videoHash = ($('set-video-hash').value || '').trim();
     save('settings', settings); $('cs-settings').hidden = true; refresh();
   }
@@ -950,7 +1030,9 @@ geotab.addin.cameraSafety = function () {
     $('cs-refresh').onclick = refresh;
     $('cs-days').onchange = function () { save('days', this.value); refresh(); };
     ['f-driver', 'f-device', 'f-type'].forEach(function (id) { $(id).onchange = function () { markFilters(); filterChanged(); }; });
-    $('f-reset').onclick = function () { $('f-driver').value = ''; $('f-device').value = ''; $('f-type').value = ''; markFilters(); filterChanged(); };
+    // グループを変えたら、ドライバー・車両の選択肢をそのグループのものに作り直す
+    $('f-group').onchange = function () { save('group', this.value); renderFilters(); filterChanged(); };
+    $('f-reset').onclick = function () { $('f-group').value = ''; save('group', ''); $('f-driver').value = ''; $('f-device').value = ''; $('f-type').value = ''; renderFilters(); filterChanged(); };
     $('cs-filter').oninput = function () { if (data) renderList(); };
     $('cs-only-todo').onchange = function () { view.onlyTodo = this.checked; if (data) renderList(); };
     $('cs-csv').onclick = exportCsv;
@@ -1023,6 +1105,7 @@ geotab.addin.cameraSafety = function () {
       settings = Object.assign({ rules: null, videoHash: '' }, load('settings', {}));
       marks = load('marks', {});
       var d = load('days', null); if (d) $('cs-days').value = d;
+      savedGroup = load('group', '') || null;
       var ly = load('layers', null); if (ly) { $('l-tracks').checked = ly.tracks !== false; $('l-heat').checked = ly.heat !== false; $('l-points').checked = !!ly.points; }
       if (!bound) { bind(); bound = true; }
       fitHeight();
