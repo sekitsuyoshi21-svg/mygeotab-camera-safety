@@ -3,105 +3,142 @@
   --bg: #f5f7fa; --card: #fff; --text: #1f2937; --muted: #6b7280; --line: #e5e7eb;
   --accent: #0b5cad; --crit: #dc2626; --warn: #f59e0b; --info: #64748b; --ok: #15803d;
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
-  color: var(--text); background: var(--bg); padding: 16px; box-sizing: border-box; min-height: 100%;
-  font-size: 14px;
+  color: var(--text); background: var(--bg); box-sizing: border-box; font-size: 13px;
+  display: flex; flex-direction: column; height: 760px; /* 実際の高さは表示範囲に合わせてJSで設定 */
 }
 #cameraSafety *, #cameraSafety *::before, #cameraSafety *::after { box-sizing: border-box; }
-#cameraSafety h1 { font-size: 20px; margin: 0; }
-#cameraSafety h2 { font-size: 15px; margin: 0; }
+#cameraSafety h1 { font-size: 18px; margin: 0; }
+#cameraSafety h2 { font-size: 14px; margin: 0; }
 #cameraSafety .cs-muted { color: var(--muted); font-size: 12px; font-weight: 400; }
+#cameraSafety .cs-note { margin: 0 0 6px; }
 #cameraSafety .r { text-align: right; }
 
-#cameraSafety .cs-header { display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-#cameraSafety .cs-title { display: flex; align-items: center; gap: 10px; }
-#cameraSafety .cs-controls, #cameraSafety .cs-head-right { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#cameraSafety .cs-header { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 8px 14px; background: #fff; border-bottom: 1px solid var(--line); }
+#cameraSafety .cs-title, #cameraSafety .cs-controls, #cameraSafety .cs-head-right { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 #cameraSafety .cs-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #e0e7ff; color: #3730a3; }
 #cameraSafety .cs-badge.demo { background: #fef3c7; color: #92400e; }
 #cameraSafety select, #cameraSafety input[type=search], #cameraSafety input[type=text] {
-  font: inherit; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--text);
+  font: inherit; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: var(--text);
 }
 #cameraSafety .cs-btn { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer; text-decoration: none; display: inline-block; }
 #cameraSafety .cs-btn-ghost { background: #fff; color: var(--accent); }
 #cameraSafety .cs-btn-sm { padding: 3px 10px; font-size: 12px; }
 #cameraSafety .cs-btn:disabled { opacity: .45; cursor: default; }
+#cameraSafety .cs-link { font: inherit; font-size: 12px; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; }
 #cameraSafety .cs-check { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+#cameraSafety .cs-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
-#cameraSafety .cs-message { padding: 10px 14px; border-radius: 8px; margin-bottom: 12px; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+/* 本体：左の列＋地図 */
+#cameraSafety .cs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 400px 1fr; }
+#cameraSafety .cs-side { overflow-y: auto; padding: 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+#cameraSafety .cs-box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+#cameraSafety .cs-box-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; }
+
+#cameraSafety .cs-message { padding: 8px 12px; border-radius: 8px; background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 #cameraSafety .cs-message.info { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
 
+/* 絞り込み */
+#cameraSafety .cs-filters > label { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; margin-bottom: 6px; }
+#cameraSafety .cs-filters select { width: 100%; min-width: 0; }
+#cameraSafety .cs-filters select.on { border-color: var(--accent); background: #eff6ff; font-weight: 600; }
+#cameraSafety .cs-layers { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding-top: 6px; border-top: 1px dashed var(--line); }
+#cameraSafety .cs-layers > span { color: var(--muted); font-size: 12px; width: 100%; }
+
 /* KPI */
-#cameraSafety .cs-kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 12px; }
-#cameraSafety .cs-kpi { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 10px 14px; }
-#cameraSafety .cs-kpi span { display: block; color: var(--muted); font-size: 12px; }
-#cameraSafety .cs-kpi strong { display: block; font-size: 26px; font-variant-numeric: tabular-nums; line-height: 1.3; }
-#cameraSafety .cs-kpi small { display: block; color: var(--muted); font-size: 11px; min-height: 1em; }
+#cameraSafety .cs-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+#cameraSafety .cs-kpi { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 8px; padding: 6px 10px; }
+#cameraSafety .cs-kpi span { display: block; color: var(--muted); font-size: 11px; }
+#cameraSafety .cs-kpi strong { display: block; font-size: 20px; font-variant-numeric: tabular-nums; line-height: 1.3; }
+#cameraSafety .cs-kpi small { display: block; color: var(--muted); font-size: 10px; min-height: 1em; }
 #cameraSafety .cs-kpi small.up { color: var(--crit); font-weight: 700; }
 #cameraSafety .cs-kpi small.down { color: var(--ok); font-weight: 700; }
 #cameraSafety .cs-kpi.crit { border-left-color: var(--crit); }
 #cameraSafety .cs-kpi.crit strong { color: var(--crit); }
 #cameraSafety .cs-kpi.score { border-left-color: var(--ok); }
 #cameraSafety .cs-kpi.todo { border-left-color: var(--warn); }
-
-#cameraSafety .cs-card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
-#cameraSafety .cs-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 10px; }
-#cameraSafety .cs-row2 { display: grid; grid-template-columns: 1fr 1.4fr; gap: 12px; }
-#cameraSafety .cs-row2 > .cs-card { margin-bottom: 12px; }
+#cameraSafety .cs-kpi.dist { border-left-color: #2563eb; }
 
 /* 種類別（横棒） */
-#cameraSafety .cs-types { display: grid; gap: 4px; }
-#cameraSafety .cs-type { display: grid; grid-template-columns: 9em 1fr 3.5em; align-items: center; gap: 8px; padding: 3px 6px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; background: none; font: inherit; color: inherit; text-align: left; }
+#cameraSafety .cs-types { display: grid; gap: 2px; }
+#cameraSafety .cs-type { display: grid; grid-template-columns: 7.5em 1fr 2.6em; align-items: center; gap: 6px; padding: 2px 4px; border-radius: 5px; cursor: pointer; border: 1px solid transparent; background: none; font: inherit; color: inherit; text-align: left; }
 #cameraSafety .cs-type:hover { background: #f3f4f6; }
 #cameraSafety .cs-type.on { background: #e8f0fb; border-color: #93c5fd; }
-#cameraSafety .cs-type .bar { height: 14px; border-radius: 3px; background: var(--info); min-width: 2px; }
+#cameraSafety .cs-type .bar { height: 11px; border-radius: 3px; background: var(--info); min-width: 2px; display: block; }
 #cameraSafety .cs-type .bar.crit { background: var(--crit); }
 #cameraSafety .cs-type .bar.warn { background: var(--warn); }
 #cameraSafety .cs-type b { text-align: right; font-variant-numeric: tabular-nums; }
 #cameraSafety .cs-type .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 日別 */
-#cameraSafety .cs-trend svg { width: 100%; height: 190px; display: block; }
-#cameraSafety .cs-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+#cameraSafety .cs-trend svg { width: 100%; height: 130px; display: block; }
+#cameraSafety .cs-legend { display: flex; gap: 12px; font-size: 11px; color: var(--muted); margin-top: 2px; }
 #cameraSafety .cs-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
 #cameraSafety .cs-legend i.crit { background: var(--crit); }
 #cameraSafety .cs-legend i.warn { background: var(--warn); }
 #cameraSafety .cs-legend i.info { background: var(--info); }
 
+/* TOP5 */
+#cameraSafety .cs-hm-top { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+#cameraSafety .cs-hm-top li { display: grid; grid-template-columns: 1.6em 1fr auto; gap: 6px; align-items: center; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; cursor: pointer; }
+#cameraSafety .cs-hm-top li:hover { background: #f3f4f6; }
+#cameraSafety .cs-hm-top li b.no { width: 1.6em; height: 1.6em; border-radius: 50%; background: var(--crit); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; }
+#cameraSafety .cs-hm-top li .addr { font-size: 12px; line-height: 1.3; }
+#cameraSafety .cs-hm-top li .addr small { display: block; color: var(--muted); font-size: 11px; }
+#cameraSafety .cs-hm-top li .n { font-weight: 700; font-variant-numeric: tabular-nums; }
+
 /* 表 */
-#cameraSafety .cs-table-wrap { max-height: 360px; overflow: auto; }
-#cameraSafety .cs-list-wrap { max-height: 520px; }
+#cameraSafety .cs-table-wrap { max-height: 300px; overflow: auto; }
+#cameraSafety .cs-list-wrap { max-height: 420px; }
 #cameraSafety .cs-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
-#cameraSafety .cs-table th { position: sticky; top: 0; z-index: 1; background: #f9fafb; text-align: left; font-weight: 600; font-size: 12px; color: var(--muted); }
+#cameraSafety .cs-table th { position: sticky; top: 0; z-index: 1; background: #f9fafb; text-align: left; font-weight: 600; font-size: 11px; color: var(--muted); }
 #cameraSafety .cs-table th.r { text-align: right; }
-#cameraSafety .cs-table th, #cameraSafety .cs-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+#cameraSafety .cs-table th, #cameraSafety .cs-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 #cameraSafety .cs-table tbody tr[data-id] { cursor: pointer; }
 #cameraSafety .cs-table tbody tr[data-id]:hover { background: #f3f4f6; }
 #cameraSafety .cs-table tbody tr.on { background: #e8f0fb; }
+#cameraSafety .cs-list td { white-space: normal; line-height: 1.35; }
+#cameraSafety .cs-list td small { display: block; color: var(--muted); font-size: 11px; }
 #cameraSafety .cs-list tr.acked td { color: #9ca3af; }
 #cameraSafety .cs-list tr.acked .cs-tag { opacity: .55; }
+#cameraSafety .cs-list-tools { margin-bottom: 4px; }
+#cameraSafety .cs-list-tools input[type=search] { flex: 1; min-width: 120px; }
 
-#cameraSafety .cs-score { display: inline-flex; align-items: center; gap: 8px; }
-#cameraSafety .cs-score b { width: 2.2em; text-align: right; font-size: 15px; }
-#cameraSafety .cs-score .track { width: 120px; height: 8px; border-radius: 4px; background: #eef0f3; overflow: hidden; }
-#cameraSafety .cs-score .fill { height: 100%; border-radius: 4px; }
+#cameraSafety .cs-score { display: inline-flex; align-items: center; gap: 6px; }
+#cameraSafety .cs-score b { width: 2em; text-align: right; font-size: 14px; }
+#cameraSafety .cs-score .track { width: 60px; height: 7px; border-radius: 4px; background: #eef0f3; overflow: hidden; }
+#cameraSafety .cs-score .fill { height: 100%; border-radius: 4px; display: block; }
 #cameraSafety .s-good { color: var(--ok); } #cameraSafety .fill.s-good { background: var(--ok); }
 #cameraSafety .s-mid { color: #b45309; } #cameraSafety .fill.s-mid { background: var(--warn); }
 #cameraSafety .s-bad { color: var(--crit); } #cameraSafety .fill.s-bad { background: var(--crit); }
-#cameraSafety .cs-rankno { display: inline-block; min-width: 1.8em; text-align: center; font-weight: 700; }
+#cameraSafety .cs-rankno { display: inline-block; min-width: 1.6em; text-align: center; font-weight: 700; }
 
-#cameraSafety .cs-tag { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 10px; color: #fff; background: var(--info); }
+#cameraSafety .cs-tag { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 10px; color: #fff; background: var(--info); }
 #cameraSafety .cs-tag.crit { background: var(--crit); }
 #cameraSafety .cs-tag.warn { background: #d97706; }
-#cameraSafety .cs-chips { display: inline-flex; gap: 6px; flex-wrap: wrap; }
-#cameraSafety .cs-chip { font: inherit; font-size: 12px; border: 1px solid #93c5fd; background: #eff6ff; color: #1e40af; border-radius: 12px; padding: 2px 10px; cursor: pointer; }
-#cameraSafety .cs-chip::after { content: " ×"; }
-#cameraSafety .cs-video-btn { font: inherit; font-size: 12px; border: 1px solid var(--line); background: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; color: var(--accent); }
-#cameraSafety .cs-video-btn.has { background: var(--accent); color: #fff; border-color: var(--accent); }
+#cameraSafety .cs-video-btn { font: inherit; font-size: 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
 #cameraSafety .cs-ack { width: 16px; height: 16px; cursor: pointer; }
 
-/* 切り替えボタン */
 #cameraSafety .cs-seg { display: inline-flex; border: 1px solid var(--accent); border-radius: 6px; overflow: hidden; }
-#cameraSafety .cs-seg button { font: inherit; font-size: 12px; border: 0; padding: 4px 12px; background: #fff; color: var(--accent); cursor: pointer; }
+#cameraSafety .cs-seg button { font: inherit; font-size: 12px; border: 0; padding: 3px 10px; background: #fff; color: var(--accent); cursor: pointer; }
 #cameraSafety .cs-seg button.on { background: var(--accent); color: #fff; }
+
+/* 地図 */
+#cameraSafety .cs-hm-map { position: relative; overflow: hidden; background: #e5e7eb; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; min-height: 300px; }
+#cameraSafety .cs-hm-map.drag { cursor: grabbing; }
+#cameraSafety .cs-hm-map.hover { cursor: pointer; }
+#cameraSafety .cs-hm-tiles { position: absolute; inset: 0; filter: grayscale(.6) brightness(1.05) contrast(.9); }
+#cameraSafety .cs-hm-tiles img { position: absolute; width: 256px; height: 256px; max-width: none; user-select: none; pointer-events: none; }
+#cameraSafety .cs-hm-map canvas { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+#cameraSafety .cs-hm-tools { position: absolute; right: 12px; top: 12px; display: flex; flex-direction: column; gap: 4px; }
+#cameraSafety .cs-hm-tools button { font: inherit; font-size: 14px; min-width: 42px; padding: 5px 6px; border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+#cameraSafety .cs-hm-tools button:hover { background: #f1f5f9; }
+#cameraSafety .cs-hm-legend { position: absolute; left: 12px; bottom: 22px; background: rgba(255,255,255,.94); padding: 6px 10px; border-radius: 8px; font-size: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.15); display: grid; gap: 3px; }
+#cameraSafety .cs-hm-legend i.trk { display: inline-block; width: 26px; height: 4px; border-radius: 2px; background: #1d4ed8; opacity: .7; margin-right: 6px; vertical-align: middle; }
+#cameraSafety .cs-hm-grad { display: inline-block; width: 26px; height: 9px; border-radius: 4px; margin-right: 6px; vertical-align: middle; background: linear-gradient(90deg, #22c55e, #facc15, #f97316, #dc2626); }
+#cameraSafety .cs-hm-attr { position: absolute; right: 0; bottom: 0; background: rgba(255,255,255,.8); font-size: 10px; padding: 1px 5px; color: #374151; }
+#cameraSafety .cs-hm-attr a { color: var(--accent); }
+#cameraSafety .cs-hm-help { position: absolute; right: 12px; bottom: 22px; background: rgba(255,255,255,.85); font-size: 11px; padding: 2px 8px; border-radius: 6px; color: var(--muted); }
+#cameraSafety .cs-hm-status { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(15,23,42,.85); color: #fff; font-size: 12px; padding: 5px 14px; border-radius: 14px; max-width: 80%; text-align: center; }
 
 /* モーダル（MyGeotabの左メニュー・上部バーに隠れないよう、Add-Inの表示範囲にJSで合わせる） */
 #cameraSafety .cs-modal { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: flex-start; justify-content: center; z-index: 50; padding: 24px 16px; overflow: auto; }
@@ -112,8 +149,7 @@
 #cameraSafety legend { font-weight: 600; padding: 0 4px; }
 #cameraSafety fieldset label { display: block; }
 #cameraSafety fieldset input[type=text] { width: 100%; margin-top: 4px; }
-#cameraSafety .cs-row { display: flex; gap: 8px; flex-wrap: wrap; }
-#cameraSafety .cs-row input[type=search] { flex: 1; min-width: 180px; }
+#cameraSafety fieldset .cs-row input[type=search] { flex: 1; min-width: 180px; }
 #cameraSafety .cs-pick-list { max-height: 280px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; }
 #cameraSafety .cs-pick-list label { display: flex; gap: 8px; align-items: center; padding: 3px 0; cursor: pointer; }
 #cameraSafety .cs-pick-list label small { color: var(--muted); }
@@ -127,7 +163,6 @@
 #cameraSafety .cs-d-video video, #cameraSafety .cs-d-video svg, #cameraSafety .cs-d-map iframe { width: 100%; height: 100%; border: 0; display: block; }
 #cameraSafety .cs-d-novideo { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; color: #e2e8f0; text-align: center; padding: 16px; }
 #cameraSafety .cs-d-novideo p { margin: 0; font-size: 13px; color: #cbd5e1; }
-#cameraSafety .cs-d-overlay { position: absolute; left: 8px; top: 8px; background: rgba(0,0,0,.55); color: #fff; font-size: 12px; padding: 2px 8px; border-radius: 4px; }
 #cameraSafety .cs-d-maplink { position: absolute; right: 8px; bottom: 8px; background: #fff; font-size: 12px; padding: 3px 8px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.2); color: var(--accent); text-decoration: none; }
 #cameraSafety .cs-d-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 12px 0; }
 #cameraSafety .cs-d-info div { background: #f9fafb; border-radius: 6px; padding: 6px 10px; }
@@ -136,13 +171,14 @@
 #cameraSafety .cs-d-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 #cameraSafety .cs-d-actions input[type=text] { flex: 1; min-width: 200px; }
 #cameraSafety .cs-d-ack { font-weight: 600; }
-#cameraSafety .cs-empty { color: var(--muted); padding: 16px; text-align: center; }
+#cameraSafety .cs-empty { color: var(--muted); padding: 12px; text-align: center; }
 
-@media (max-width: 1000px) {
-  #cameraSafety .cs-kpis { grid-template-columns: repeat(3, 1fr); }
-  #cameraSafety .cs-row2, #cameraSafety .cs-d-grid { grid-template-columns: 1fr; }
-}
-@media (max-width: 560px) {
-  #cameraSafety { padding: 10px; }
-  #cameraSafety .cs-kpis { grid-template-columns: repeat(2, 1fr); }
+/* 狭い画面：地図を上、項目を下に */
+@media (max-width: 900px) {
+  #cameraSafety { height: auto !important; }
+  #cameraSafety .cs-body { display: flex; flex-direction: column-reverse; }
+  #cameraSafety .cs-hm-map { height: 60vh; }
+  #cameraSafety .cs-side { overflow: visible; border-right: 0; }
+  #cameraSafety .cs-d-grid { grid-template-columns: 1fr; }
+  #cameraSafety .cs-hm-help { display: none; }
 }

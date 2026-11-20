@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.1.0">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.3.0">
 </head>
 <body>
 <div id="cameraSafety">
@@ -14,82 +14,121 @@
       <span id="cs-source" class="cs-badge">-</span>
     </div>
     <div class="cs-controls">
-      <label>期間
-        <select id="cs-days">
-          <option value="1">今日</option>
-          <option value="-1">昨日</option>
-          <option value="7">直近7日</option>
-          <option value="30" selected>直近30日</option>
-          <option value="90">直近90日</option>
-        </select>
-      </label>
-      <button id="cs-refresh" class="cs-btn">更新</button>
-      <button id="cs-open-settings" class="cs-btn cs-btn-ghost">設定</button>
+      <span id="cs-loaded" class="cs-muted"></span>
+      <button id="cs-refresh" class="cs-btn cs-btn-sm">更新</button>
+      <button id="cs-open-settings" class="cs-btn cs-btn-ghost cs-btn-sm">設定</button>
     </div>
   </header>
 
-  <div id="cs-message" class="cs-message" hidden></div>
+  <div class="cs-body">
+    <!-- 左側の列 -->
+    <aside class="cs-side" id="cs-side">
+      <div id="cs-message" class="cs-message" hidden></div>
 
-  <section class="cs-kpis">
-    <div class="cs-kpi"><span>警報の合計</span><strong id="kpi-total">-</strong><small id="kpi-total-sub"></small></div>
-    <div class="cs-kpi"><span>100kmあたり</span><strong id="kpi-rate">-</strong><small id="kpi-rate-sub"></small></div>
-    <div class="cs-kpi crit"><span>重大な警報</span><strong id="kpi-crit">-</strong><small>衝突・スマホ・脇見など</small></div>
-    <div class="cs-kpi score"><span>平均の安全スコア</span><strong id="kpi-score">-</strong><small>100点満点</small></div>
-    <div class="cs-kpi todo"><span>未確認</span><strong id="kpi-todo">-</strong><small>確認済みの印がない警報</small></div>
-  </section>
+      <section class="cs-box cs-filters">
+        <div class="cs-box-head"><h2>絞り込み</h2><button type="button" id="f-reset" class="cs-link">条件をクリア</button></div>
+        <label>期間
+          <select id="cs-days">
+            <option value="1">今日</option>
+            <option value="-1">昨日</option>
+            <option value="7">直近7日</option>
+            <option value="30" selected>直近30日</option>
+            <option value="90">直近90日</option>
+          </select>
+        </label>
+        <label>ドライバー <select id="f-driver"></select></label>
+        <label>車両 <select id="f-device"></select></label>
+        <label>アラート <select id="f-type"></select></label>
+        <div class="cs-layers">
+          <span>地図に表示</span>
+          <label class="cs-check"><input type="checkbox" id="l-tracks" checked> 走行軌跡</label>
+          <label class="cs-check"><input type="checkbox" id="l-heat" checked> ヒートマップ</label>
+          <label class="cs-check"><input type="checkbox" id="l-points"> 警報の地点</label>
+        </div>
+      </section>
 
-  <section class="cs-row2">
-    <div class="cs-card">
-      <div class="cs-card-head"><h2>種類別の件数</h2><span class="cs-muted">クリックで一覧を絞り込み</span></div>
-      <div id="cs-types" class="cs-types"></div>
-    </div>
-    <div class="cs-card">
-      <div class="cs-card-head"><h2>日別の推移</h2><span class="cs-muted" id="cs-trend-note"></span></div>
-      <div id="cs-trend" class="cs-trend"></div>
-      <div class="cs-legend"><span><i class="crit"></i>重大</span><span><i class="warn"></i>注意</span><span><i class="info"></i>その他</span></div>
-    </div>
-  </section>
+      <section class="cs-kpis">
+        <div class="cs-kpi"><span>警報の合計</span><strong id="kpi-total">-</strong><small id="kpi-total-sub"></small></div>
+        <div class="cs-kpi"><span>100kmあたり</span><strong id="kpi-rate">-</strong><small id="kpi-rate-sub"></small></div>
+        <div class="cs-kpi crit"><span>重大な警報</span><strong id="kpi-crit">-</strong><small>衝突・スマホ・脇見など</small></div>
+        <div class="cs-kpi score"><span>平均の安全スコア</span><strong id="kpi-score">-</strong><small>100点満点</small></div>
+        <div class="cs-kpi todo"><span>未確認</span><strong id="kpi-todo">-</strong><small>確認済みの印がない警報</small></div>
+        <div class="cs-kpi dist"><span>走行距離</span><strong id="kpi-km">-</strong><small id="kpi-km-sub"></small></div>
+      </section>
 
-  <section class="cs-card">
-    <div class="cs-card-head">
-      <h2>安全スコア ランキング</h2>
-      <span class="cs-head-right">
-        <span class="cs-seg" id="cs-rank-by">
-          <button data-by="driver" class="on">運転手別</button><button data-by="device">車両別</button>
-        </span>
-        <span class="cs-muted">点数が低い順・クリックで一覧を絞り込み</span>
-      </span>
-    </div>
-    <div class="cs-table-wrap">
-      <table class="cs-table">
-        <thead><tr><th>順位</th><th id="cs-rank-name">運転手</th><th>安全スコア</th><th class="r">走行距離</th><th class="r">警報</th><th class="r">100kmあたり</th><th>多い警報</th></tr></thead>
-        <tbody id="cs-rank"></tbody>
-      </table>
-    </div>
-  </section>
+      <section class="cs-box">
+        <div class="cs-box-head"><h2>種類別の件数</h2><span class="cs-muted">クリックで絞り込み</span></div>
+        <div id="cs-types" class="cs-types"></div>
+      </section>
 
-  <section class="cs-card">
-    <div class="cs-card-head">
-      <h2>警報一覧 <span id="cs-list-count" class="cs-muted"></span></h2>
-      <span class="cs-head-right">
-        <span id="cs-chips" class="cs-chips"></span>
-        <label class="cs-check"><input type="checkbox" id="cs-only-todo"> 未確認だけ</label>
-        <input type="search" id="cs-filter" placeholder="運転手・車両で絞り込み">
-        <button id="cs-csv" class="cs-btn cs-btn-ghost">CSV出力</button>
-      </span>
-    </div>
-    <div class="cs-table-wrap cs-list-wrap">
-      <table class="cs-table cs-list">
-        <thead><tr><th>確認</th><th>日時</th><th>種類</th><th>運転手</th><th>車両</th><th class="r">速度</th><th>映像</th></tr></thead>
-        <tbody id="cs-events"></tbody>
-      </table>
-    </div>
-  </section>
+      <section class="cs-box">
+        <div class="cs-box-head"><h2>日別の推移</h2><span class="cs-muted" id="cs-trend-note"></span></div>
+        <div id="cs-trend" class="cs-trend"></div>
+        <div class="cs-legend"><span><i class="crit"></i>重大</span><span><i class="warn"></i>注意</span><span><i class="info"></i>その他</span></div>
+      </section>
+
+      <section class="cs-box">
+        <div class="cs-box-head"><h2>警報が多い場所 TOP5</h2><span class="cs-muted">クリックで地図を拡大</span></div>
+        <ol id="hm-top" class="cs-hm-top"></ol>
+      </section>
+
+      <section class="cs-box">
+        <div class="cs-box-head">
+          <h2>安全スコア ランキング</h2>
+          <span class="cs-seg" id="cs-rank-by"><button data-by="driver" class="on">運転手</button><button data-by="device">車両</button></span>
+        </div>
+        <p class="cs-muted cs-note">点数が低い順。クリックするとその人（車両）で絞り込みます。</p>
+        <div class="cs-table-wrap">
+          <table class="cs-table">
+            <thead><tr><th>順位</th><th id="cs-rank-name">運転手</th><th>スコア</th><th class="r">警報</th><th class="r">走行</th></tr></thead>
+            <tbody id="cs-rank"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="cs-box">
+        <div class="cs-box-head">
+          <h2>警報一覧 <span id="cs-list-count" class="cs-muted"></span></h2>
+          <button id="cs-csv" class="cs-btn cs-btn-ghost cs-btn-sm">CSV出力</button>
+        </div>
+        <div class="cs-row cs-list-tools">
+          <label class="cs-check"><input type="checkbox" id="cs-only-todo"> 未確認だけ</label>
+          <input type="search" id="cs-filter" placeholder="名前・車両で検索">
+        </div>
+        <p class="cs-muted cs-note">行をクリックすると地図でその場所を表示、「▶」で映像・詳細を開きます。</p>
+        <div class="cs-table-wrap cs-list-wrap">
+          <table class="cs-table cs-list">
+            <thead><tr><th>確認</th><th>日時・種類</th><th>運転手・車両</th><th></th></tr></thead>
+            <tbody id="cs-events"></tbody>
+          </table>
+        </div>
+      </section>
+    </aside>
+
+    <!-- 地図（メイン） -->
+    <main class="cs-hm-map" id="hm-map">
+      <div class="cs-hm-tiles" id="hm-tiles"></div>
+      <canvas id="hm-canvas"></canvas>
+      <div class="cs-hm-tools">
+        <button type="button" id="hm-zin" title="拡大">＋</button>
+        <button type="button" id="hm-zout" title="縮小">－</button>
+        <button type="button" id="hm-fit" title="すべての軌跡と警報が入るように表示">全体</button>
+      </div>
+      <div class="cs-hm-legend">
+        <div><i class="trk"></i>走行軌跡（よく通る道ほど濃い）</div>
+        <div><span class="cs-hm-grad"></span>警報 少ない → 多い</div>
+        <div id="hm-count" class="cs-muted"></div>
+      </div>
+      <div class="cs-hm-attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div>
+      <div class="cs-hm-status" id="hm-status" hidden></div>
+      <div class="cs-hm-help">ドラッグで移動・Ctrl＋ホイールで拡大縮小</div>
+    </main>
+  </div>
 
   <!-- 警報の詳細（映像・地図） -->
   <div id="cs-detail" class="cs-modal" hidden>
     <div class="cs-modal-body cs-detail-body">
-      <div class="cs-card-head">
+      <div class="cs-box-head">
         <h2 id="cs-d-title">警報の詳細</h2>
         <span class="cs-head-right">
           <button id="cs-d-prev" class="cs-btn cs-btn-ghost cs-btn-sm" title="前の警報（←キー）">◀ 前</button>
@@ -128,7 +167,7 @@
         <label>MyGeotabのビデオ画面のURL（「#」以降）
           <input type="text" id="set-video-hash" placeholder="例: #videoEvents">
         </label>
-        <p class="cs-muted">MyGeotabで「ビデオ → ビデオイベント」を開いたときのアドレス欄の「#」から後ろを貼り付けると、一覧の「映像」ボタンからその画面を開きます。</p>
+        <p class="cs-muted">MyGeotabで「ビデオ → ビデオイベント」を開いたときのアドレス欄の「#」から後ろを貼り付けると、詳細画面のボタンからその画面を開きます。</p>
       </fieldset>
       <fieldset>
         <legend>接続チェック</legend>
@@ -142,6 +181,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.1.0"></script>
+<script src="cameraSafety.js?v=0.3.0"></script>
 </body>
 </html>
