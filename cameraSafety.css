@@ -292,3 +292,7 @@
 #cameraSafety .cs-kpi.crit span,
 #cameraSafety .cs-kpi.crit strong,
 #cameraSafety .cs-kpi.crit small { color: #fff; }
+/* 警報一覧：左の列を広げても横いっぱいに引き伸ばさず、中身の幅に合わせて詰める（v0.6.6） */
+#cameraSafety .cs-list { width: auto; max-width: 100%; }
+#cameraSafety .cs-list th:nth-child(2), #cameraSafety .cs-list td:nth-child(2),
+#cameraSafety .cs-list th:nth-child(3), #cameraSafety .cs-list td:nth-child(3) { padding-right: 20px; }#cameraSafety .cs-list td:last-child { width: auto; }
