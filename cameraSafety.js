@@ -1,5 +1,5 @@
 /*
- * 安全運転ダッシュボード MyGeotab Add-In
+ * ヒートマップダッシュボード MyGeotab Add-In（旧名：安全運転ダッシュボード）
  * GO Focus Plus（カメラ）の警報と、急ブレーキ・急加速などの運転ルールの例外イベント（ExceptionEvent）を集計し、
  * 地図（車両全体の走行軌跡＋警報のヒートマップ）をメインに、左の列で絞り込み・件数・ランキング・警報一覧を表示する。
  * MyGeotab 外（ローカルでファイルを開いた場合）はデモデータで動作する。
@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.2';
+  var VERSION = '0.6.3';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1101,7 +1101,7 @@ geotab.addin.cameraSafety = function () {
     var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
     var a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    a.download = '安全運転_警報一覧.csv'; document.body.appendChild(a); a.click(); a.remove();
+    a.download = 'ヒートマップ_警報一覧.csv'; document.body.appendChild(a); a.click(); a.remove();
   }
 
   // ---------- 更新 ----------
