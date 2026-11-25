@@ -29,8 +29,14 @@
 #cameraSafety .cs-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
 /* 本体：左の列＋地図 */
-#cameraSafety .cs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 400px 1fr; }
-#cameraSafety .cs-side { overflow-y: auto; padding: 10px; border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+/* 左の列の幅は --cs-side-w（境目のドラッグでJSが変更。初期値 400px） */
+#cameraSafety .cs-body { flex: 1; min-height: 0; display: grid; grid-template-columns: var(--cs-side-w, 400px) 8px minmax(0, 1fr); }
+#cameraSafety .cs-side { overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+#cameraSafety .cs-splitter { position: relative; cursor: col-resize; background: #e5e7eb; touch-action: none; user-select: none; -webkit-user-select: none; z-index: 2; }
+#cameraSafety .cs-splitter span { position: absolute; left: 50%; top: 50%; width: 4px; height: 44px; transform: translate(-50%, -50%); border-radius: 2px; background: repeating-linear-gradient(#9ca3af 0 3px, transparent 3px 6px); }
+#cameraSafety .cs-splitter:hover, #cameraSafety .cs-splitter.is-drag, #cameraSafety .cs-splitter:focus-visible { background: #93c5fd; outline: none; }
+#cameraSafety .cs-splitter:hover span, #cameraSafety .cs-splitter.is-drag span { background: repeating-linear-gradient(#1d4ed8 0 3px, transparent 3px 6px); }
+#cameraSafety.is-resizing, #cameraSafety.is-resizing * { cursor: col-resize !important; user-select: none !important; }
 #cameraSafety .cs-box { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
 #cameraSafety .cs-box-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 8px; }
 
@@ -228,6 +234,7 @@
   #cameraSafety .cs-body { display: flex; flex-direction: column-reverse; }
   #cameraSafety .cs-hm-map { height: 60vh; }
   #cameraSafety .cs-side { overflow: visible; border-right: 0; }
+  #cameraSafety .cs-splitter { display: none; }
   #cameraSafety .cs-d-grid { grid-template-columns: 1fr; }
   #cameraSafety .cs-hm-help { display: none; }
 }

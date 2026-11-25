@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.4';
+  var VERSION = '0.6.5';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1368,6 +1368,56 @@ geotab.addin.cameraSafety = function () {
     $('nt-add').onclick = function () { ntApply(true); };
     $('nt-remove').onclick = function () { ntApply(false); };
     bindMap();
+    bindSplitter();
+  }
+
+  // ---------- 左の列の幅：境目をドラッグして変える（ダブルクリックで元に戻す・幅は記憶） ----------
+  var SIDE_DEFAULT = 400, SIDE_MIN = 320;
+  function sideMax() {   // 地図が小さくなりすぎないように、画面の65%まで（画面の幅がまだ分からないときは制限しない）
+    var cw = $('cameraSafety').clientWidth;
+    return cw ? Math.max(SIDE_MIN, Math.round(cw * 0.65)) : 4000;
+  }
+  function setSideWidth(w, persist) {
+    w = Math.round(Math.max(SIDE_MIN, Math.min(sideMax(), w)));
+    $('cameraSafety').style.setProperty('--cs-side-w', w + 'px');
+    if (persist) save('sideW', w);
+    return w;
+  }
+  var splitTimer = null;
+  function afterSideResize() {
+    clearTimeout(splitTimer);
+    splitTimer = setTimeout(function () { if (data) { renderTrend(); drawMap(); } }, 60);
+  }
+  function bindSplitter() {
+    var sp = $('cs-splitter'), root = $('cameraSafety'), drag = null;
+    sp.addEventListener('pointerdown', function (ev) {
+      if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+      ev.preventDefault();
+      drag = { x: ev.clientX, w: $('cs-side').getBoundingClientRect().width };
+      sp.classList.add('is-drag'); root.classList.add('is-resizing');
+      try { sp.setPointerCapture(ev.pointerId); } catch (e) { /* ignore */ }
+    });
+    sp.addEventListener('pointermove', function (ev) {
+      if (!drag) return;
+      setSideWidth(drag.w + (ev.clientX - drag.x), false);
+      afterSideResize();
+    });
+    function end() {
+      if (!drag) return;
+      drag = null; sp.classList.remove('is-drag'); root.classList.remove('is-resizing');
+      setSideWidth($('cs-side').getBoundingClientRect().width, true);
+      afterSideResize();
+    }
+    sp.addEventListener('pointerup', end);
+    sp.addEventListener('pointercancel', end);
+    sp.addEventListener('dblclick', function () { setSideWidth(SIDE_DEFAULT, true); afterSideResize(); });
+    // キーボード（←→）でも変えられる
+    sp.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight') return;
+      ev.preventDefault();
+      setSideWidth($('cs-side').getBoundingClientRect().width + (ev.key === 'ArrowRight' ? 20 : -20), true);
+      afterSideResize();
+    });
   }
 
   var bound = false;
@@ -1390,6 +1440,7 @@ geotab.addin.cameraSafety = function () {
       savedGroup = load('group', '') || null;
       var ts = load('types', []); view.types = Array.isArray(ts) ? ts.filter(function (k) { return TYPE_BY_KEY[k]; }) : [];
       var ly = load('layers', null); if (ly) { $('l-tracks').checked = ly.tracks !== false; $('l-heat').checked = ly.heat !== false; $('l-points').checked = !!ly.points; }
+      var sw = load('sideW', null); if (sw) setSideWidth(sw, false);   // 前回の左の列の幅
       if (!bound) { bind(); bound = true; }
       fitHeight();
     });

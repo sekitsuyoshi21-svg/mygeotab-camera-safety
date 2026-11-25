@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ヒートマップダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.6.4">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.6.5">
 </head>
 <body>
 <div id="cameraSafety">
@@ -123,6 +123,10 @@
       </section>
     </aside>
 
+    <!-- 左の列と地図の境目：ドラッグで左の列の幅を変える（ダブルクリックで元に戻す） -->
+    <div class="cs-splitter" id="cs-splitter" role="separator" aria-orientation="vertical" aria-label="左の列の幅を変える" tabindex="0"
+         title="ドラッグで左の列の幅を変えられます（ダブルクリックで元の幅に戻す）"><span></span></div>
+
     <!-- 地図（メイン） -->
     <main class="cs-hm-map" id="hm-map">
       <div class="cs-hm-tiles" id="hm-tiles"></div>
@@ -226,6 +230,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.6.4"></script>
+<script src="cameraSafety.js?v=0.6.5"></script>
 </body>
 </html>
