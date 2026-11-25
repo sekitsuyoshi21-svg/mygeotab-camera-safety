@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.0';
+  var VERSION = '0.6.1';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -678,7 +678,7 @@ geotab.addin.cameraSafety = function () {
         '<small>' + fmtShort(e.t) + (e.pos ? '・' + Math.round(e.pos.spd) + 'km/h' : '') + '</small></td>' +
         '<td>' + esc(nameOf('driver', e.drvId)) + '<small>' + esc(nameOf('device', e.devId)) + '</small></td>' +
         '<td>' + (hasVideo(e)
-          ? '<button type="button" class="cs-video-btn" data-open="' + i + '" title="映像あり：映像・詳細を開く">▶</button>'
+          ? '<button type="button" class="cs-video-btn" data-open="' + i + '" title="映像の可能性あり（カメラの警報）：詳細とビデオ画面へのリンクを開く">▶</button>'
           : '<button type="button" class="cs-video-btn none" data-open="' + i + '" title="映像なし（車両の機器・モービルアイの警報）：詳細を開く">詳細</button>') + '</td></tr>';
     }).join('') || '<tr><td colspan="4" class="cs-empty">' + (view.onlyTodo || view.onlyVideo ? '条件に合う警報はありません' : '該当する警報はありません') + '</td></tr>';
     ensurePositions(shown.slice(0, 100));
@@ -1023,9 +1023,11 @@ geotab.addin.cameraSafety = function () {
     else if (!hasVideo(e)) v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">この警報には、通常は映像がありません</p>' +
       '<p>' + (e.type.src === 'me' ? 'モービルアイ（ME）が検知した警報' : '車両の機器（GOデバイス）が検知した警報') + 'のため、カメラの映像は残りません。</p>' +
       (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">念のためMyGeotabのビデオ画面を開く（新しいタブ）</a>' : '') + '</div>';
-    else v.innerHTML = '<div class="cs-d-novideo"><p>この警報の映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
+    else v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">カメラが検知した警報です（映像の可能性あり）</p>' +
+      '<p>映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
       (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a><p>' + esc(nameOf('device', e.devId)) + '・' + fmtT(e.t) + ' の映像を探してください</p>'
-        : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') + '</div>';
+        : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') +
+      '<p class="cs-d-novideo-note">※ 同じ種類の警報が短い間隔で続いたとき（クールダウン）や、録画の保存先が「カメラ」の設定、通信状況などによって、映像が保存されていないことがあります。</p></div>';
     // 地図
     var mp = $('cs-d-map');
     if (e.pos) {
@@ -1093,7 +1095,7 @@ geotab.addin.cameraSafety = function () {
     var rows = [['日時', '種類', 'ルール名', '映像', '運転手', '車両', '速度(km/h)', '緯度', '経度', '確認済み', 'メモ']];
     listRows.forEach(function (e) {
       var m = marks[e.id] || {};
-      rows.push([fmtT(e.t), e.type.label, e.ruleName, hasVideo(e) ? 'あり' : 'なし', nameOf('driver', e.drvId), nameOf('device', e.devId),
+      rows.push([fmtT(e.t), e.type.label, e.ruleName, hasVideo(e) ? '可能性あり（カメラ）' : 'なし', nameOf('driver', e.drvId), nameOf('device', e.devId),
         e.pos ? Math.round(e.pos.spd) : '', e.pos ? e.pos.lat : '', e.pos ? e.pos.lon : '', m.ack ? '済' : '', m.memo || '']);
     });
     var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
