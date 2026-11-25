@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.5.2">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.6.0">
 </head>
 <body>
 <div id="cameraSafety">
@@ -109,9 +109,10 @@
         </div>
         <div class="cs-row cs-list-tools">
           <label class="cs-check"><input type="checkbox" id="cs-only-todo"> 未確認だけ</label>
+          <label class="cs-check"><input type="checkbox" id="cs-only-video"> 映像ありだけ</label>
           <input type="search" id="cs-filter" placeholder="名前・車両で検索">
         </div>
-        <p class="cs-muted cs-note">行をクリックすると地図でその場所を表示、「▶」で映像・詳細を開きます。</p>
+        <p class="cs-muted cs-note">行をクリックすると地図でその場所を表示。<span class="cs-video-btn cs-legend-btn">▶</span>＝映像あり（カメラの警報）、<span class="cs-video-btn none cs-legend-btn">詳細</span>＝映像なし（車両の機器・MEの警報）。</p>
         <div class="cs-table-wrap cs-list-wrap">
           <table class="cs-table cs-list">
             <thead><tr><th>確認</th><th>日時・種類</th><th>運転手・車両</th><th></th></tr></thead>
@@ -224,6 +225,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.5.2"></script>
+<script src="cameraSafety.js?v=0.6.0"></script>
 </body>
 </html>

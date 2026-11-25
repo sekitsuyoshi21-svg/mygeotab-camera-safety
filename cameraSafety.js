@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.5.2';
+  var VERSION = '0.6.0';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -79,6 +79,14 @@ geotab.addin.cameraSafety = function () {
     return OTHER;
   }
   function isMeRule(rule) { return !KNOWN_RULES[rule.id] && ME_RE.test(rule.name || ''); }
+  // 映像があるか：カメラ（GO Focus Plus）が検知する警報のルールだけが映像を残す。
+  // 車両の機器（GOデバイス）の急ブレーキ・急加速・急ハンドル・速度超過・衝突検知や、モービルアイ（ME）の警報は通常映像なし
+  var VIDEO_RE = /distract|inattent|phone|cell|smok|drink|eating|fatigue|drows|yawn|tailgat|close\s*follow|forward\s*collision|near\s*collision|lane\s*(depart|straddl)|solid\s*lane|rolling\s*stop|no\s*seat\s*belt|defensive|camera\s*button|脇見|わき見|スマホ|携帯|喫煙|飲食|居眠り|あくび|車間|車線|一時停止|カメラ/i;
+  function ruleHasVideo(rule) {
+    if (!rule || KNOWN_RULES[rule.id] || isMeRule(rule) || baseTypeOfRule(rule).key === 'camera') return false;
+    return VIDEO_RE.test(rule.name || '');
+  }
+  function hasVideo(e) { return !!(e.media || e.video); }
   function typeOfRule(rule) { var b = baseTypeOfRule(rule); return isMeRule(rule) ? meType(b) : b; }
   function isTarget(rule) {
     var t = baseTypeOfRule(rule);
@@ -157,7 +165,7 @@ geotab.addin.cameraSafety = function () {
           (r[4 + i] || []).forEach(function (x) {
             var dv = x.device && x.device.id; if (!devices[dv]) return;
             events.push({ id: x.id, t: new Date(x.activeFrom), end: x.activeTo ? new Date(x.activeTo) : null, devId: dv,
-              drvId: driverId(x.driver), type: type, ruleName: ruleById[rule.id].name, pos: undefined });
+              drvId: driverId(x.driver), type: type, ruleName: ruleById[rule.id].name, pos: undefined, video: ruleHasVideo(ruleById[rule.id]) });
           });
         });
         events = dedupe(events);
@@ -180,6 +188,7 @@ geotab.addin.cameraSafety = function () {
         if (last.ruleName.indexOf(e.ruleName) < 0) last.ruleName += '／' + e.ruleName;
         if (e.end && (!last.end || e.end > last.end)) last.end = e.end;
         if (last.drvId === UNKNOWN_DRIVER) last.drvId = e.drvId;
+        if (e.video) last.video = true;   // まとめたうち1つでもカメラの警報なら映像あり
         return;
       }
       out.push(e); last = e;
@@ -384,12 +393,13 @@ geotab.addin.cameraSafety = function () {
         events.push({ id: 'e' + (n++), t: new Date(t), end: new Date(t + 4000 + rnd() * 8000), devId: dev, drvId: 'u' + di,
           type: TYPE_BY_KEY[key], ruleName: TYPE_BY_KEY[key].label + '（デモ）',
           pos: { lat: ll[0], lon: ll[1], spd: key === 'button' ? 0 : Math.round(15 + rnd() * 55) },
-          media: { demo: true } });
+          // デモ：カメラの警報だけ映像あり（車両の機器の急ブレーキ等・MEの警報は映像なし）
+          media: /^(brake|accel|corner|speed|collision)$|^me_/.test(key) ? undefined : { demo: true } });
       }
     });
     // 運転手未登録の走行
     trips.push({ devId: 'b11', drvId: UNKNOWN_DRIVER, km: 140 });
-    events.push({ id: 'e' + (n++), t: new Date(now - 2 * DAY), devId: 'b11', drvId: UNKNOWN_DRIVER, type: TYPE_BY_KEY.brake, ruleName: '急ブレーキ（デモ）', pos: { lat: 35.61, lon: 140.11, spd: 42 }, media: { demo: true } });
+    events.push({ id: 'e' + (n++), t: new Date(now - 2 * DAY), devId: 'b11', drvId: UNKNOWN_DRIVER, type: TYPE_BY_KEY.brake, ruleName: '急ブレーキ（デモ）', pos: { lat: 35.61, lon: 140.11, spd: 42 } });
     // デモでは確認済みの印を一部に付けておく
     if (!load('demoMarked', false)) {
       events.forEach(function (e, i) { if (+e.t < now - 5 * DAY && i % 3) marks[e.id] = { ack: true }; });
@@ -462,6 +472,7 @@ geotab.addin.cameraSafety = function () {
       if (!opts.noWho && c.dev && e.devId !== c.dev) return false;
       if (!opts.noType && !typeOk(e, c.types)) return false;
       if (opts.list && view.onlyTodo && (marks[e.id] || {}).ack) return false;
+      if (opts.list && view.onlyVideo && !hasVideo(e)) return false;
       if (q && (nameOf('driver', e.drvId) + ' ' + nameOf('device', e.devId)).indexOf(q) < 0) return false;
       return true;
     });
@@ -666,8 +677,10 @@ geotab.addin.cameraSafety = function () {
         '<td><span class="cs-tag ' + e.type.sev + '" title="' + esc(e.ruleName) + '">' + esc(e.type.label) + '</span>' + (m.memo ? ' <span title="' + esc(m.memo) + '">📝</span>' : '') +
         '<small>' + fmtShort(e.t) + (e.pos ? '・' + Math.round(e.pos.spd) + 'km/h' : '') + '</small></td>' +
         '<td>' + esc(nameOf('driver', e.drvId)) + '<small>' + esc(nameOf('device', e.devId)) + '</small></td>' +
-        '<td><button type="button" class="cs-video-btn" data-open="' + i + '" title="映像・詳細を開く">▶</button></td></tr>';
-    }).join('') || '<tr><td colspan="4" class="cs-empty">' + (view.onlyTodo ? '未確認の警報はありません' : '該当する警報はありません') + '</td></tr>';
+        '<td>' + (hasVideo(e)
+          ? '<button type="button" class="cs-video-btn" data-open="' + i + '" title="映像あり：映像・詳細を開く">▶</button>'
+          : '<button type="button" class="cs-video-btn none" data-open="' + i + '" title="映像なし（車両の機器・モービルアイの警報）：詳細を開く">詳細</button>') + '</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="cs-empty">' + (view.onlyTodo || view.onlyVideo ? '条件に合う警報はありません' : '該当する警報はありません') + '</td></tr>';
     ensurePositions(shown.slice(0, 100));
   }
 
@@ -1007,6 +1020,9 @@ geotab.addin.cameraSafety = function () {
     if (e.media && e.media.demo) v.innerHTML = demoVideo(e);
     else if (e.media && e.media.id) v.innerHTML = e.media.type === 'Image' ? '<img alt="" style="width:100%;height:100%;object-fit:contain" src="' + esc(mediaUrl(e.media)) + '">'
       : '<video controls autoplay muted src="' + esc(mediaUrl(e.media)) + '"></video>';
+    else if (!hasVideo(e)) v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">この警報には、通常は映像がありません</p>' +
+      '<p>' + (e.type.src === 'me' ? 'モービルアイ（ME）が検知した警報' : '車両の機器（GOデバイス）が検知した警報') + 'のため、カメラの映像は残りません。</p>' +
+      (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">念のためMyGeotabのビデオ画面を開く（新しいタブ）</a>' : '') + '</div>';
     else v.innerHTML = '<div class="cs-d-novideo"><p>この警報の映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
       (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a><p>' + esc(nameOf('device', e.devId)) + '・' + fmtT(e.t) + ' の映像を探してください</p>'
         : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') + '</div>';
@@ -1074,10 +1090,10 @@ geotab.addin.cameraSafety = function () {
 
   // ---------- CSV ----------
   function exportCsv() {
-    var rows = [['日時', '種類', 'ルール名', '運転手', '車両', '速度(km/h)', '緯度', '経度', '確認済み', 'メモ']];
+    var rows = [['日時', '種類', 'ルール名', '映像', '運転手', '車両', '速度(km/h)', '緯度', '経度', '確認済み', 'メモ']];
     listRows.forEach(function (e) {
       var m = marks[e.id] || {};
-      rows.push([fmtT(e.t), e.type.label, e.ruleName, nameOf('driver', e.drvId), nameOf('device', e.devId),
+      rows.push([fmtT(e.t), e.type.label, e.ruleName, hasVideo(e) ? 'あり' : 'なし', nameOf('driver', e.drvId), nameOf('device', e.devId),
         e.pos ? Math.round(e.pos.spd) : '', e.pos ? e.pos.lat : '', e.pos ? e.pos.lon : '', m.ack ? '済' : '', m.memo || '']);
     });
     var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
@@ -1288,6 +1304,7 @@ geotab.addin.cameraSafety = function () {
     });
     $('cs-filter').oninput = function () { if (data) renderList(); };
     $('cs-only-todo').onchange = function () { view.onlyTodo = this.checked; if (data) renderList(); };
+    $('cs-only-video').onchange = function () { view.onlyVideo = this.checked; if (data) renderList(); };
     $('cs-csv').onclick = exportCsv;
     $('cs-types').onclick = function (e) { var b = e.target.closest('[data-type]'); if (b) toggleType(b.dataset.type); };
     $('cs-rank-by').onclick = function (e) {

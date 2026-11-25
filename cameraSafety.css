@@ -143,6 +143,11 @@
 #cameraSafety .cs-tag.crit { background: var(--crit); }
 #cameraSafety .cs-tag.warn { background: #d97706; }
 #cameraSafety .cs-video-btn { font: inherit; font-size: 12px; border: 1px solid var(--accent); background: var(--accent); color: #fff; border-radius: 6px; padding: 2px 8px; cursor: pointer; }
+/* 映像なしの警報のボタン（灰色）と、説明文の中の見本 */
+#cameraSafety .cs-video-btn.none { background: #fff; color: var(--muted); border-color: #cbd5e1; font-size: 11px; padding: 2px 6px; }
+#cameraSafety .cs-legend-btn { display: inline-block; cursor: default; font-size: 10px; padding: 0 5px; line-height: 1.5; vertical-align: 1px; }
+#cameraSafety .cs-d-novideo-title { font-size: 15px !important; font-weight: 700; color: #f1f5f9 !important; }
+#cameraSafety .cs-d-golink { color: #93c5fd; font-size: 12px; text-decoration: underline; }
 #cameraSafety .cs-ack { width: 16px; height: 16px; cursor: pointer; }
 
 #cameraSafety .cs-seg { display: inline-flex; border: 1px solid var(--accent); border-radius: 6px; overflow: hidden; }
