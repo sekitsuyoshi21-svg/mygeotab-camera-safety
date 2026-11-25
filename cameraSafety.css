@@ -247,6 +247,8 @@
 #cameraSafety .cs-kpi small { font-size: 12px; }
 /* 種類別・TOP5・凡例 */
 #cameraSafety .cs-type { grid-template-columns: 10em 1fr 3em; }
+/* 安全スコアの計算方法の注意書き */
+#cameraSafety .cs-score-note { margin: 0 0 6px; padding: 5px 8px; border-radius: 6px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; font-size: 12px; line-height: 1.5; }
 /* ランキング：文字を大きくしても横にはみ出さないよう、名前は折り返し・棒グラフは短く */
 #cameraSafety #cs-rank td { padding: 5px 4px; }
 #cameraSafety #cs-rank td:nth-child(2) { white-space: normal; word-break: break-all; }

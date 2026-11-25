@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ヒートマップダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.6.3">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.6.4">
 </head>
 <body>
 <div id="cameraSafety">
@@ -67,7 +67,7 @@
         <div class="cs-kpi"><span>警報の合計</span><strong id="kpi-total">-</strong><small id="kpi-total-sub"></small></div>
         <div class="cs-kpi"><span>100kmあたり</span><strong id="kpi-rate">-</strong><small id="kpi-rate-sub"></small></div>
         <div class="cs-kpi crit"><span>重大な警報</span><strong id="kpi-crit">-</strong><small>衝突・スマホ・脇見など</small></div>
-        <div class="cs-kpi score"><span>平均の安全スコア</span><strong id="kpi-score">-</strong><small>100点満点</small></div>
+        <div class="cs-kpi score" title="危険度の高い警報（脇見・スマホ・居眠り・衝突など）だけで計算しています。MEの警報や速度超過は含みません"><span>平均の安全スコア</span><strong id="kpi-score">-</strong><small>100点満点・危険度の高い警報だけで計算</small></div>
         <div class="cs-kpi todo"><span>未確認</span><strong id="kpi-todo">-</strong><small>確認済みの印がない警報</small></div>
         <div class="cs-kpi dist"><span>走行距離</span><strong id="kpi-km">-</strong><small id="kpi-km-sub"></small></div>
       </section>
@@ -94,6 +94,7 @@
           <span class="cs-seg" id="cs-rank-by"><button data-by="driver" class="on">運転手</button><button data-by="device">車両</button></span>
         </div>
         <p class="cs-muted cs-note">点数が低い順。クリックするとその人（車両）で絞り込みます。</p>
+        <p class="cs-score-note">※ スコアは危険度の高い警報（脇見・スマホ・居眠り・衝突など）だけで計算しています。MEの警報・速度超過は含みません。「警報」の件数はすべての警報です。</p>
         <div class="cs-table-wrap">
           <table class="cs-table">
             <thead><tr><th>順位</th><th id="cs-rank-name">運転手</th><th>スコア</th><th class="r">警報</th><th class="r">走行</th></tr></thead>
@@ -225,6 +226,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.6.3"></script>
+<script src="cameraSafety.js?v=0.6.4"></script>
 </body>
 </html>

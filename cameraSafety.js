@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.3';
+  var VERSION = '0.6.4';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -480,7 +480,10 @@ geotab.addin.cameraSafety = function () {
   function kmOf(c) {
     return data.trips.reduce(function (a, t) { return a + (inGroup(t.devId, c.grp) && (!c.drv || t.drvId === c.drv) && (!c.dev || t.devId === c.dev) ? t.km : 0); }, 0);
   }
-  function points(list) { return list.reduce(function (a, e) { return a + e.type.w; }, 0); }
+  // 安全スコアに入れる警報：危険度の高い警報（重大＝脇見・スマホ・居眠り/疲労・衝突警告・衝突検知）だけ。
+  // モービルアイ（ME）の警報、速度超過・急ブレーキなどの「注意」、喫煙・飲食などの「その他」は入れない
+  function scored(e) { return e.type.src !== 'me' && e.type.sev === 'crit'; }
+  function points(list) { return list.reduce(function (a, e) { return a + (scored(e) ? e.type.w : 0); }, 0); }
   // 安全スコア：100kmあたりの「重み付き警報点数」r から算出。100 × e^(−r/20)
   // （r=1 → 95点、r=5 → 78点、r=10 → 61点、r=20 → 37点。0点にはならず、警報が多い人どうしでも差が見える）
   // 距離が短すぎる場合は50km として扱う
