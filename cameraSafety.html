@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.5.1">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.5.2">
 </head>
 <body>
 <div id="cameraSafety">
@@ -187,6 +187,16 @@
         <p class="cs-muted">MyGeotabで「ビデオ → ビデオイベント」を開いたときのアドレス欄の「#」から後ろを貼り付けると、詳細画面のボタンからその画面を開きます。</p>
       </fieldset>
       <fieldset>
+        <legend>運転手の名前の表示順</legend>
+        <label>並べ方
+          <select id="set-name-order">
+            <option value="first">「名」の欄 → 「姓」の欄（例：沢津橋 貴之）</option>
+            <option value="last">「姓」の欄 → 「名」の欄</option>
+          </select>
+        </label>
+        <p class="cs-muted">MyGeotabのユーザー登録で、「名」の欄に苗字を入れている場合は上、「姓」の欄に苗字を入れている場合は下を選んでください。</p>
+      </fieldset>
+      <fieldset>
         <legend>メール通知（配送リスト）</legend>
         <p class="cs-muted">MyGeotabの「ルール → 配布リスト」で作った配送リスト（メールの送り先）を、警報のルールに結び付けます。喫煙・スマホ使用のようにルールの画面に出てこないカメラのルールにも設定できます。</p>
         <button type="button" id="nt-load" class="cs-btn cs-btn-ghost">配送リストを読み込む</button>
@@ -214,6 +224,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.5.1"></script>
+<script src="cameraSafety.js?v=0.5.2"></script>
 </body>
 </html>

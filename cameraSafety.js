@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.5.1';
+  var VERSION = '0.5.2';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -142,7 +142,11 @@ geotab.addin.cameraSafety = function () {
         var r = res[0], media = res[1];
         var devices = {}, drivers = {}, trips = [], devRaw = {};
         r[0].forEach(function (d) { devices[d.id] = d.name || d.id; devRaw[d.id] = (d.groups || []).map(function (g) { return g.id; }); });
-        r[1].forEach(function (u) { drivers[u.id] = ((u.lastName || '') + ' ' + (u.firstName || '')).trim() || u.name || u.id; });
+        // 運転手の名前：j21では「名（First name）」の欄に苗字が入っているため、初期設定は「名の欄 → 姓の欄」の順（設定で切替可）
+        r[1].forEach(function (u) {
+          var a = u.firstName || '', b = u.lastName || '';
+          drivers[u.id] = (settings.nameOrder === 'last' ? b + ' ' + a : a + ' ' + b).trim() || u.name || u.id;
+        });
         r[2].forEach(function (t) {
           var dv = t.device && t.device.id; if (!devices[dv]) return;
           trips.push({ devId: dv, drvId: driverId(t.driver), km: t.distance || 0, start: +new Date(t.start), stop: +new Date(t.stop || t.start) });
@@ -1116,6 +1120,7 @@ geotab.addin.cameraSafety = function () {
   function openSettings() {
     draftRules = (settings.rules || []).slice();
     $('set-video-hash').value = settings.videoHash || '';
+    $('set-name-order').value = settings.nameOrder === 'last' ? 'last' : 'first';
     $('set-check-out').hidden = true;
     $('nt-body').hidden = true; ntMsg('');
     $('cs-settings').hidden = false; placeModal($('cs-settings'));
@@ -1144,6 +1149,7 @@ geotab.addin.cameraSafety = function () {
     syncDraft();
     if (!demo) { settings.rules = draftRules; settings.manual = true; }
     settings.videoHash = ($('set-video-hash').value || '').trim();
+    settings.nameOrder = $('set-name-order').value;
     save('settings', settings); $('cs-settings').hidden = true; refresh();
   }
   // ---------- メール通知：配送リスト（DistributionList）に警報のルールを結び付ける ----------
@@ -1354,7 +1360,7 @@ geotab.addin.cameraSafety = function () {
       });
     });
     return ready.then(function () {
-      settings = Object.assign({ rules: null, videoHash: '' }, load('settings', {}));
+      settings = Object.assign({ rules: null, videoHash: '', nameOrder: 'first' }, load('settings', {}));
       // ビデオ画面：Geotab標準のビデオ（GO Focus）画面を初期設定にする（「設定」で変更可）
       if (!settings.videoHash) settings.videoHash = DEFAULT_VIDEO_HASH;
       marks = load('marks', {});
