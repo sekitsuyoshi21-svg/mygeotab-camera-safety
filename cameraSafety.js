@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.4.5';
+  var VERSION = '0.5.0';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -49,7 +49,7 @@ geotab.addin.cameraSafety = function () {
   var DEFAULT_VIDEO_HASH = '#addin-geotabvideo-events,visibleCategoryId:21';
   var marks = {};                                   // 確認済み・メモ { eventId: {ack, memo} }
   var data = null, loading = false;
-  var view = { rankBy: 'driver', onlyTodo: false };
+  var view = { rankBy: 'driver', onlyTodo: false, types: [] };   // types：アラートの複数選択（空＝すべて）
   var listRows = [], detailList = [], detailIdx = -1;
   var $ = function (id) { return document.getElementById(id); };
 
@@ -426,12 +426,9 @@ geotab.addin.cameraSafety = function () {
     if (by === 'driver') return id === UNKNOWN_DRIVER ? '（運転手未登録）' : data.drivers[id] || id;
     return data.devices[id] || id;
   }
-  function f() { return { grp: $('f-group').value, drv: $('f-driver').value, dev: $('f-device').value, type: $('f-type').value }; }
-  function typeOk(e, ty) {
-    if (ty === '_crit') return e.type.sev === 'crit';
-    if (ty === '_noinfo') return e.type.sev !== 'info';
-    return !ty || e.type.key === ty;
-  }
+  // アラートは複数選択（view.types：選んだ種類のキーの一覧。空ならすべて）
+  function f() { return { grp: $('f-group').value, drv: $('f-driver').value, dev: $('f-device').value, types: view.types }; }
+  function typeOk(e, types) { return !types.length || types.indexOf(e.type.key) >= 0; }
   // opts.noType: 種類の条件を外す / opts.noWho: ドライバー・車両の条件を外す（グループの条件は残す） / opts.list: 一覧の条件（未確認だけ・検索）も使う
   function filtered(opts, src) {
     opts = opts || {}; var c = f(), q = opts.list ? ($('cs-filter').value || '').trim() : '';
@@ -439,7 +436,7 @@ geotab.addin.cameraSafety = function () {
       if (c.grp && !inGroup(e.devId, c.grp)) return false;
       if (!opts.noWho && c.drv && e.drvId !== c.drv) return false;
       if (!opts.noWho && c.dev && e.devId !== c.dev) return false;
-      if (!opts.noType && !typeOk(e, c.type)) return false;
+      if (!opts.noType && !typeOk(e, c.types)) return false;
       if (opts.list && view.onlyTodo && (marks[e.id] || {}).ack) return false;
       if (q && (nameOf('driver', e.drvId) + ' ' + nameOf('device', e.devId)).indexOf(q) < 0) return false;
       return true;
@@ -456,7 +453,7 @@ geotab.addin.cameraSafety = function () {
   function scoreCls(s) { return s >= 80 ? 's-good' : s >= 60 ? 's-mid' : 's-bad'; }
 
   function renderFilters() {
-    var gSel = $('f-group'), dSel = $('f-driver'), vSel = $('f-device'), tSel = $('f-type'), c = f(), drvs = {}, devs = {}, cnt = {};
+    var gSel = $('f-group'), dSel = $('f-driver'), vSel = $('f-device'), c = f(), drvs = {}, devs = {}, cnt = {};
     // グループ（階層は字下げで表示）。前回選んだグループを最初に復元
     var gids = {};
     if (savedGroup != null) { c.grp = savedGroup; savedGroup = null; }
@@ -475,13 +472,51 @@ geotab.addin.cameraSafety = function () {
     }
     dSel.innerHTML = opts(drvs, 'driver', '全員'); dSel.value = drvs[c.drv] !== undefined ? c.drv : '';
     vSel.innerHTML = opts(devs, 'device', '全車両'); vSel.value = devs[c.dev] !== undefined ? c.dev : '';
-    var keys = Object.keys(cnt).sort(function (a, b) { return SEV_ORDER[TYPE_BY_KEY[a].sev] - SEV_ORDER[TYPE_BY_KEY[b].sev] || cnt[b] - cnt[a]; });
-    tSel.innerHTML = '<option value="">すべて</option><option value="_noinfo">危険なもの（重大＋注意）</option><option value="_crit">重大のみ</option>' +
-      keys.map(function (k) { return '<option value="' + k + '">' + esc(TYPE_BY_KEY[k].label) + '（' + cnt[k] + '件）</option>'; }).join('');
-    tSel.value = c.type === '' || c.type.charAt(0) === '_' || cnt[c.type] ? c.type : '';
+    // アラート：期間内にある種類だけを一覧に出す（重大 → 注意 → その他、件数の多い順）
+    typeCnt = cnt;
+    typeKeys = Object.keys(cnt).sort(function (a, b) { return SEV_ORDER[TYPE_BY_KEY[a].sev] - SEV_ORDER[TYPE_BY_KEY[b].sev] || cnt[b] - cnt[a]; });
+    view.types = view.types.filter(function (k) { return cnt[k]; });
+    renderTypeList();
     markFilters();
   }
-  function markFilters() { ['f-group', 'f-driver', 'f-device', 'f-type'].forEach(function (id) { $(id).classList.toggle('on', !!$(id).value); }); }
+  var typeCnt = {}, typeKeys = [];
+  function renderTypeList() {
+    $('f-type-list').innerHTML = typeKeys.map(function (k) {
+      var t = TYPE_BY_KEY[k];
+      return '<label><input type="checkbox" data-tk="' + k + '"' + (view.types.indexOf(k) >= 0 ? ' checked' : '') + '>' +
+        '<span class="dot ' + t.sev + '"></span><span class="nm">' + esc(t.label) + '</span><span class="ct">' + typeCnt[k] + '件</span></label>';
+    }).join('') || '<div class="cs-muted">期間内の警報はありません</div>';
+  }
+  // 選択の内容を短い言葉で（例：「すべて」「重大のみ」「脇見運転・急ブレーキ」「脇見運転 ほか3種類」）
+  function typeText() {
+    var sel = view.types; if (!sel.length) return 'すべて';
+    function sameAs(sevs) {
+      var want = typeKeys.filter(function (k) { return sevs.indexOf(TYPE_BY_KEY[k].sev) >= 0; });
+      return want.length === sel.length && want.every(function (k) { return sel.indexOf(k) >= 0; });
+    }
+    if (sel.length === typeKeys.length) return 'すべて';
+    if (sameAs(['crit'])) return '重大のみ';
+    if (sameAs(['crit', 'warn'])) return '危険なもの（重大＋注意）';
+    var labels = typeKeys.filter(function (k) { return sel.indexOf(k) >= 0; }).map(function (k) { return TYPE_BY_KEY[k].label; });
+    return labels.length <= 2 ? labels.join('・') : labels[0] + ' ほか' + (labels.length - 1) + '種類';
+  }
+  function setTypes(list) {
+    // 全部選んだ場合は「すべて」と同じ（条件なし）として扱う
+    view.types = list.length >= typeKeys.length ? [] : list;
+    save('types', view.types);
+    renderTypeList(); filterChanged();
+  }
+  function toggleType(k) {
+    var i = view.types.indexOf(k), list = view.types.slice();
+    if (i >= 0) list.splice(i, 1); else list.push(k);
+    setTypes(list);
+  }
+  function markFilters() {
+    ['f-group', 'f-driver', 'f-device'].forEach(function (id) { $(id).classList.toggle('on', !!$(id).value); });
+    $('f-type').classList.toggle('on', view.types.length > 0);
+    $('f-type-text').textContent = typeText();
+    $('f-type-btn').title = view.types.length ? '選択中：' + typeKeys.filter(function (k) { return view.types.indexOf(k) >= 0; }).map(function (k) { return TYPE_BY_KEY[k].label; }).join('、') : 'すべてのアラート';
+  }
   function setFilter(id, value) { var el = $(id); el.value = el.value === value ? '' : value; if (el.value !== value && el.value !== '') el.value = ''; markFilters(); filterChanged(); }
   function filterChanged() { hm.userMoved = false; render(); fitMap(); requestDraw(); }
 
@@ -511,13 +546,13 @@ geotab.addin.cameraSafety = function () {
   }
 
   function renderTypes() {
-    var list = filtered({ noType: true }), cnt = {}, cur = f().type;
+    var list = filtered({ noType: true }), cnt = {}, cur = view.types;
     list.forEach(function (e) { cnt[e.type.key] = (cnt[e.type.key] || 0) + 1; });
     var keys = Object.keys(cnt).sort(function (a, b) { return cnt[b] - cnt[a]; });
     var max = keys.length ? cnt[keys[0]] : 1;
     $('cs-types').innerHTML = keys.map(function (k) {
       var t = TYPE_BY_KEY[k];
-      return '<button type="button" class="cs-type' + (cur === k ? ' on' : '') + '" data-type="' + k + '" title="' + esc(t.label) + 'だけを表示">' +
+      return '<button type="button" class="cs-type' + (cur.indexOf(k) >= 0 ? ' on' : '') + '" data-type="' + k + '" title="クリックで「' + esc(t.label) + '」を選択に追加／解除">' +
         '<span class="name">' + esc(t.label) + '</span><span><span class="bar ' + t.sev + '" style="width:' + (cnt[k] / max * 100).toFixed(1) + '%"></span></span><b>' + cnt[k] + '</b></button>';
     }).join('') || '<div class="cs-empty">期間内の警報はありません</div>';
   }
@@ -1178,14 +1213,29 @@ geotab.addin.cameraSafety = function () {
   function bind() {
     $('cs-refresh').onclick = refresh;
     $('cs-days').onchange = function () { save('days', this.value); refresh(); };
-    ['f-driver', 'f-device', 'f-type'].forEach(function (id) { $(id).onchange = function () { markFilters(); filterChanged(); }; });
+    ['f-driver', 'f-device'].forEach(function (id) { $(id).onchange = function () { markFilters(); filterChanged(); }; });
     // グループを変えたら、ドライバー・車両の選択肢をそのグループのものに作り直す
     $('f-group').onchange = function () { save('group', this.value); renderFilters(); filterChanged(); };
-    $('f-reset').onclick = function () { $('f-group').value = ''; save('group', ''); $('f-driver').value = ''; $('f-device').value = ''; $('f-type').value = ''; renderFilters(); filterChanged(); };
+    $('f-reset').onclick = function () { $('f-group').value = ''; save('group', ''); $('f-driver').value = ''; $('f-device').value = ''; view.types = []; save('types', []); renderFilters(); filterChanged(); };
+    // アラートの複数選択：ボタンで一覧を開閉、チェックで即反映、一覧の外をクリックすると閉じる
+    var tPanel = $('f-type-panel');
+    $('f-type-btn').onclick = function () { tPanel.hidden = !tPanel.hidden; };
+    $('f-type-close').onclick = function () { tPanel.hidden = true; };
+    $('f-type-list').onchange = function (e) {
+      var cb = e.target.closest('input[data-tk]'); if (!cb) return;
+      var list = []; this.querySelectorAll('input[data-tk]:checked').forEach(function (x) { list.push(x.dataset.tk); });
+      setTypes(list);
+    };
+    tPanel.querySelector('.cs-ms-quick').onclick = function (e) {
+      var b = e.target.closest('[data-q]'); if (!b) return;
+      var q = b.dataset.q;
+      setTypes(q === 'all' ? [] : typeKeys.filter(function (k) { var s = TYPE_BY_KEY[k].sev; return q === 'crit' ? s === 'crit' : s !== 'info'; }));
+    };
+    document.addEventListener('click', function (e) { if (!tPanel.hidden && !e.target.closest('#f-type')) tPanel.hidden = true; });
     $('cs-filter').oninput = function () { if (data) renderList(); };
     $('cs-only-todo').onchange = function () { view.onlyTodo = this.checked; if (data) renderList(); };
     $('cs-csv').onclick = exportCsv;
-    $('cs-types').onclick = function (e) { var b = e.target.closest('[data-type]'); if (b) setFilter('f-type', b.dataset.type); };
+    $('cs-types').onclick = function (e) { var b = e.target.closest('[data-type]'); if (b) toggleType(b.dataset.type); };
     $('cs-rank-by').onclick = function (e) {
       var b = e.target.closest('button[data-by]'); if (!b) return;
       view.rankBy = b.dataset.by;
@@ -1262,6 +1312,7 @@ geotab.addin.cameraSafety = function () {
       marks = load('marks', {});
       var d = load('days', null); if (d) $('cs-days').value = d;
       savedGroup = load('group', '') || null;
+      var ts = load('types', []); view.types = Array.isArray(ts) ? ts.filter(function (k) { return TYPE_BY_KEY[k]; }) : [];
       var ly = load('layers', null); if (ly) { $('l-tracks').checked = ly.tracks !== false; $('l-heat').checked = ly.heat !== false; $('l-points').checked = !!ly.points; }
       if (!bound) { bind(); bound = true; }
       fitHeight();

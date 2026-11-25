@@ -41,6 +41,28 @@
 #cameraSafety .cs-filters > label { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; margin-bottom: 6px; }
 #cameraSafety .cs-filters select { width: 100%; min-width: 0; }
 #cameraSafety .cs-filters select.on { border-color: var(--accent); background: #eff6ff; font-weight: 600; }
+/* アラートの複数選択（チェックボックスの一覧） */
+#cameraSafety .cs-filters > .cs-frow { display: grid; grid-template-columns: 5.5em 1fr; align-items: center; gap: 6px; margin-bottom: 6px; }
+#cameraSafety .cs-ms { position: relative; min-width: 0; }
+#cameraSafety .cs-ms-btn { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 6px; font: inherit; text-align: left; padding: 5px 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #fff; color: var(--text); cursor: pointer; }
+#cameraSafety .cs-ms-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#cameraSafety .cs-ms-btn i { font-style: normal; color: var(--muted); font-size: 11px; }
+#cameraSafety .cs-ms.on .cs-ms-btn { border-color: var(--accent); background: #eff6ff; font-weight: 600; }
+#cameraSafety .cs-ms-panel { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 250px; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 8px; }
+#cameraSafety .cs-ms-panel[hidden] { display: none; }
+#cameraSafety .cs-ms-quick { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+#cameraSafety .cs-ms-quick button { font: inherit; font-size: 12px; border: 1px solid #93c5fd; background: #eff6ff; color: #1e40af; border-radius: 12px; padding: 2px 9px; cursor: pointer; }
+#cameraSafety .cs-ms-quick button:hover { background: #dbeafe; }
+#cameraSafety .cs-ms-list { max-height: 300px; overflow-y: auto; }
+#cameraSafety .cs-ms-list label { display: flex; align-items: center; gap: 7px; padding: 4px 4px; border-radius: 5px; cursor: pointer; }
+#cameraSafety .cs-ms-list label:hover { background: #f3f4f6; }
+#cameraSafety .cs-ms-list input { width: 16px; height: 16px; margin: 0; cursor: pointer; }
+#cameraSafety .cs-ms-list .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--info); }
+#cameraSafety .cs-ms-list .dot.crit { background: var(--crit); }
+#cameraSafety .cs-ms-list .dot.warn { background: var(--warn); }
+#cameraSafety .cs-ms-list .nm { flex: 1; }
+#cameraSafety .cs-ms-list .ct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+#cameraSafety .cs-ms-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 #cameraSafety .cs-layers { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding-top: 6px; border-top: 1px dashed var(--line); }
 #cameraSafety .cs-layers > span { color: var(--muted); font-size: 12px; width: 100%; }
 

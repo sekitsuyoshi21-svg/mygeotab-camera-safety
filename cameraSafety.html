@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.4.5">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.5.0">
 </head>
 <body>
 <div id="cameraSafety">
@@ -39,7 +39,20 @@
         <label>グループ <select id="f-group"></select></label>
         <label>ドライバー <select id="f-driver"></select></label>
         <label>車両 <select id="f-device"></select></label>
-        <label>アラート <select id="f-type"></select></label>
+        <div class="cs-frow"><span>アラート</span>
+          <div class="cs-ms" id="f-type">
+            <button type="button" class="cs-ms-btn" id="f-type-btn" aria-haspopup="true"><span id="f-type-text">すべて</span><i>▾</i></button>
+            <div class="cs-ms-panel" id="f-type-panel" hidden>
+              <div class="cs-ms-quick">
+                <button type="button" data-q="all">すべて</button>
+                <button type="button" data-q="noinfo">危険なもの（重大＋注意）</button>
+                <button type="button" data-q="crit">重大のみ</button>
+              </div>
+              <div id="f-type-list" class="cs-ms-list"></div>
+              <div class="cs-ms-foot"><span class="cs-muted">チェックしたアラートだけを表示します</span><button type="button" id="f-type-close" class="cs-btn cs-btn-sm">閉じる</button></div>
+            </div>
+          </div>
+        </div>
         <div class="cs-layers">
           <span>地図に表示</span>
           <label class="cs-check"><input type="checkbox" id="l-tracks" checked> 走行軌跡</label>
@@ -199,6 +212,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.4.5"></script>
+<script src="cameraSafety.js?v=0.5.0"></script>
 </body>
 </html>
