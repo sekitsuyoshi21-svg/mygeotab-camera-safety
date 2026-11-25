@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>安全運転ダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.5.0">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.5.1">
 </head>
 <body>
 <div id="cameraSafety">
@@ -47,6 +47,8 @@
                 <button type="button" data-q="all">すべて</button>
                 <button type="button" data-q="noinfo">危険なもの（重大＋注意）</button>
                 <button type="button" data-q="crit">重大のみ</button>
+                <button type="button" data-q="cam" hidden>カメラ・車両のみ</button>
+                <button type="button" data-q="me" hidden>MEのみ</button>
               </div>
               <div id="f-type-list" class="cs-ms-list"></div>
               <div class="cs-ms-foot"><span class="cs-muted">チェックしたアラートだけを表示します</span><button type="button" id="f-type-close" class="cs-btn cs-btn-sm">閉じる</button></div>
@@ -212,6 +214,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.5.0"></script>
+<script src="cameraSafety.js?v=0.5.1"></script>
 </body>
 </html>

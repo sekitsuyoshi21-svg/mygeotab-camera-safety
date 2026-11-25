@@ -62,6 +62,11 @@
 #cameraSafety .cs-ms-list .dot.warn { background: var(--warn); }
 #cameraSafety .cs-ms-list .nm { flex: 1; }
 #cameraSafety .cs-ms-list .ct { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+#cameraSafety .cs-ms-quick button[hidden] { display: none; }
+#cameraSafety .cs-ms-group { display: flex; align-items: center; gap: 8px; margin: 8px 0 2px; padding: 4px 4px 3px; border-bottom: 1px solid var(--line); font-size: 12px; }
+#cameraSafety .cs-ms-group:first-child { margin-top: 0; }
+#cameraSafety .cs-ms-group b { flex: 1; color: var(--text); }
+#cameraSafety .cs-ms-group .ct { color: var(--muted); }
 #cameraSafety .cs-ms-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 #cameraSafety .cs-layers { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding-top: 6px; border-top: 1px dashed var(--line); }
 #cameraSafety .cs-layers > span { color: var(--muted); font-size: 12px; width: 100%; }
