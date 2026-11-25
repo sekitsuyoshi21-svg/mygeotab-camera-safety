@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.1';
+  var VERSION = '0.6.2';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -619,14 +619,14 @@ geotab.addin.cameraSafety = function () {
     var t0 = p.hourly ? +p.from : jstMidnight(+p.from), t1 = +p.to, buckets = [];
     for (var t = t0; t < t1; t += step) buckets.push({ t: t, crit: 0, warn: 0, info: 0 });
     list.forEach(function (e) { var i = Math.floor((e.t - t0) / step); if (buckets[i]) buckets[i][e.type.sev]++; });
-    var W = Math.max(280, Math.round($('cs-trend').clientWidth || 360)), H = 130, L = 24, R = 4, T = 6, B = 20, PW = W - L - R, PH = H - T - B;
+    var W = Math.max(280, Math.round($('cs-trend').clientWidth || 360)), H = 140, L = 30, R = 4, T = 8, B = 22, PW = W - L - R, PH = H - T - B;
     var max = Math.max(1, Math.max.apply(null, buckets.map(function (b) { return b.crit + b.warn + b.info; })));
     var stepY = max <= 5 ? 1 : max <= 10 ? 2 : max <= 25 ? 5 : max <= 50 ? 10 : Math.ceil(max / 50) * 10;
     max = Math.ceil(max / stepY) * stepY;
     var bw = PW / buckets.length, svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="警報件数の推移">';
     for (var g = 0; g <= max; g += stepY) {
       var y = T + PH - g / max * PH;
-      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '" stroke="#eef0f3"/><text x="' + (L - 4) + '" y="' + (y + 4) + '" font-size="10" text-anchor="end" fill="#6b7280">' + g + '</text>';
+      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y + '" y2="' + y + '" stroke="#eef0f3"/><text x="' + (L - 4) + '" y="' + (y + 4) + '" font-size="12" text-anchor="end" fill="#374151">' + g + '</text>';
     }
     var labelEvery = Math.ceil(buckets.length / 6);
     function label(t) { var d = new Date(t + JST); return p.hourly ? d.getUTCHours() + '時' : (d.getUTCMonth() + 1) + '/' + d.getUTCDate(); }
@@ -636,7 +636,7 @@ geotab.addin.cameraSafety = function () {
         if (!b[s]) return; var h = b[s] / max * PH; y -= h;
         svg += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + h.toFixed(1) + '" fill="' + { crit: '#dc2626', warn: '#f59e0b', info: '#94a3b8' }[s] + '"><title>' + label(b.t) + '：' + ({ crit: '重大', warn: '注意', info: 'その他' })[s] + ' ' + b[s] + '件</title></rect>';
       });
-      if (i % labelEvery === 0) svg += '<text x="' + (L + i * bw + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" font-size="10" text-anchor="middle" fill="#6b7280">' + label(b.t) + '</text>';
+      if (i % labelEvery === 0) svg += '<text x="' + (L + i * bw + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" font-size="12" text-anchor="middle" fill="#374151">' + label(b.t) + '</text>';
     });
     $('cs-trend').innerHTML = svg + '</svg>';
     $('cs-trend-note').textContent = p.hourly ? '1時間ごと' : '1日ごと';

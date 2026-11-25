@@ -1,6 +1,6 @@
 /* MyGeotab本体のスタイルと干渉しないよう、すべて #cameraSafety 配下に限定 */
 #cameraSafety {
-  --bg: #f5f7fa; --card: #fff; --text: #1f2937; --muted: #6b7280; --line: #e5e7eb;
+  --bg: #f5f7fa; --card: #fff; --text: #1f2937; --muted: #4b5563; --line: #e5e7eb;  /* --muted：補足の文字。見やすいよう濃いめの灰色 */
   --accent: #0b5cad; --crit: #dc2626; --warn: #f59e0b; --info: #64748b; --ok: #15803d;
   font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui, sans-serif;
   color: var(--text); background: var(--bg); box-sizing: border-box; font-size: 13px;
@@ -231,3 +231,50 @@
   #cameraSafety .cs-d-grid { grid-template-columns: 1fr; }
   #cameraSafety .cs-hm-help { display: none; }
 }
+
+/* ===== 読みやすさの調整（v0.6.2）：小さく薄かった補足の文字を、少し大きく・濃くする ===== */
+#cameraSafety { font-size: 14px; }
+#cameraSafety h2 { font-size: 15px; }
+#cameraSafety .cs-muted { font-size: 13px; }
+#cameraSafety .cs-link, #cameraSafety .cs-btn-sm, #cameraSafety .cs-seg button { font-size: 13px; }
+#cameraSafety .cs-badge { font-size: 12px; }
+/* 「地図に表示」などの小見出し */
+#cameraSafety .cs-layers > span { font-size: 13px; font-weight: 700; color: #374151; }
+#cameraSafety .cs-layers .cs-check { font-size: 14px; }
+/* 件数カード */
+#cameraSafety .cs-kpi span { font-size: 13px; font-weight: 600; color: #374151; }
+#cameraSafety .cs-kpi strong { font-size: 22px; }
+#cameraSafety .cs-kpi small { font-size: 12px; }
+/* 種類別・TOP5・凡例 */
+#cameraSafety .cs-type { grid-template-columns: 10em 1fr 3em; }
+/* ランキング：文字を大きくしても横にはみ出さないよう、名前は折り返し・棒グラフは短く */
+#cameraSafety #cs-rank td { padding: 5px 4px; }
+#cameraSafety #cs-rank td:nth-child(2) { white-space: normal; word-break: break-all; }
+#cameraSafety .cs-score .track { width: 40px; }
+#cameraSafety .cs-legend { font-size: 12px; }
+#cameraSafety .cs-trend svg { height: 140px; }
+#cameraSafety .cs-hm-top li .addr { font-size: 13px; }
+#cameraSafety .cs-hm-top li .addr small { font-size: 12px; }
+#cameraSafety .cs-hm-top li b.no { font-size: 12px; }
+/* 表（ランキング・警報一覧） */
+#cameraSafety .cs-table th { font-size: 12px; color: #374151; }
+#cameraSafety .cs-list td small { font-size: 12px; }
+#cameraSafety .cs-tag { font-size: 12px; }
+#cameraSafety .cs-video-btn.none { font-size: 12px; color: #374151; border-color: #9ca3af; }
+#cameraSafety .cs-video-btn { white-space: nowrap; }
+#cameraSafety .cs-list td:last-child { width: 1%; white-space: nowrap; }
+#cameraSafety .cs-legend-btn { font-size: 11px; }
+/* アラートの一覧 */
+#cameraSafety .cs-ms-list label { font-size: 14px; }
+#cameraSafety .cs-ms-list .ct, #cameraSafety .cs-ms-group { font-size: 13px; }
+#cameraSafety .cs-ms-quick button { font-size: 13px; }
+/* 地図の上の文字 */
+#cameraSafety .cs-hm-legend { font-size: 13px; }
+#cameraSafety .cs-hm-help { font-size: 12px; color: #374151; }
+#cameraSafety .cs-hm-attr { font-size: 11px; }
+#cameraSafety .cs-hm-tip { font-size: 13px; }
+#cameraSafety .cs-hm-tip .cs-tag, #cameraSafety .cs-hm-tip .sub { font-size: 12px; }
+/* 詳細画面 */
+#cameraSafety .cs-d-info span { font-size: 12px; color: #374151; }
+#cameraSafety .cs-d-novideo-note { font-size: 12px !important; color: #cbd5e1 !important; }
+#cameraSafety .cs-pick-list label { font-size: 14px; }
