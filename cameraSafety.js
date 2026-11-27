@@ -11,18 +11,26 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.7';
+  var VERSION = '0.7.0';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
+  // v0.7.0：名前と分け方を MyGeotab の「ビデオ → ビデオイベント」の分類に合わせた
+  //   （脇見・あくび・食事と飲み物・ボタン押下・カバー取り外し・車内遮断・道路調整推奨・ドライブレコーダー取り外し・視線下向き・速度標識）
   var TYPES = [
-    // カメラ機器の状態（遮られている・カバーが外れた・向きの調整が必要など）。運転の危険ではないため初期設定では集計しない
-    { key: 'camera', label: 'カメラの状態', sev: 'info', w: 0, re: /obstruct|cover\s*removed|adjustment\s*required|camera\s*(blocked|covered|tamper)|遮|調整が必要/i },
+    // カメラ機器の状態（運転の危険ではないため、安全スコアには入れない：w 0）
+    { key: 'cover', label: 'カバー取り外し', sev: 'info', w: 0, re: /cover\s*removed|カバー/i },
+    { key: 'cabin', label: '車内遮断', sev: 'info', w: 0, re: /obstruct|車内.*(遮|ふさ)|遮断/i },
+    { key: 'roadadj', label: '道路調整推奨', sev: 'info', w: 0, re: /road.*adjust|adjustment\s*required|調整推奨|調整が必要/i },
+    { key: 'dismount', label: 'ドライブレコーダー取り外し', sev: 'info', w: 0, re: /dismount|camera\s*removed|取り外し|取外し/i },
+    { key: 'camera', label: 'カメラの状態', sev: 'info', w: 0, re: /camera\s*(blocked|covered|tamper)|遮/i },
     { key: 'near', label: '衝突警告', sev: 'crit', w: 5, re: /near\s*collision|forward\s*collision|ニア.*衝突|衝突.*(警告|寸前|回避|注意)|前方衝突|追突/i },
     { key: 'collision', label: '衝突検知', sev: 'crit', w: 8, re: /collision|crash|accident|衝突|事故|衝撃/i },
     { key: 'phone', label: 'スマホ使用', sev: 'crit', w: 5, re: /phone|cell|携帯|スマホ|通話/i },
-    { key: 'distract', label: '脇見運転', sev: 'crit', w: 4, re: /distract|inattent|脇見|わき見|よそ見/i },
-    { key: 'fatigue', label: '居眠り・疲労', sev: 'crit', w: 5, re: /fatigue|drows|yawn|居眠り|眠気|疲労|あくび/i },
+    { key: 'lookdown', label: '視線下向き', sev: 'crit', w: 4, re: /look(ing)?\s*down|head\s*down|gaze\s*down|eyes?\s*down|視線.*下|下向き/i },
+    { key: 'distract', label: '脇見', sev: 'crit', w: 4, re: /distract|inattent|脇見|わき見|よそ見/i },
+    { key: 'yawn', label: 'あくび', sev: 'warn', w: 2, re: /yawn|あくび/i },
+    { key: 'fatigue', label: '居眠り・疲労', sev: 'crit', w: 5, re: /fatigue|drows|居眠り|眠気|疲労/i },
     { key: 'tailgate', label: '車間距離不足', sev: 'warn', w: 3, re: /tailgat|close\s*follow|following\s*distance|車間/i },
     { key: 'seatbelt', label: 'シートベルト', sev: 'warn', w: 3, re: /seat\s*belt|シートベルト/i },
     { key: 'stop', label: '一時停止違反', sev: 'warn', w: 3, re: /rolling\s*stop|stop\s*sign|一時停止/i },
@@ -30,11 +38,14 @@ geotab.addin.cameraSafety = function () {
     { key: 'brake', label: '急ブレーキ', sev: 'warn', w: 2, re: /harsh\s*brak|hard\s*brak|急ブレーキ|急制動|急減速/i },
     { key: 'accel', label: '急加速', sev: 'warn', w: 2, re: /harsh\s*accel|hard\s*accel|jackrabbit|急加速|急発進/i },
     { key: 'corner', label: '急ハンドル', sev: 'warn', w: 2, re: /corner|急ハンドル|急旋回|急カーブ/i },
+    { key: 'speedsign', label: '速度標識', sev: 'warn', w: 2, re: /speed\s*(limit\s*)?sign|traffic\s*sign|速度標識|標識/i },
     { key: 'speed', label: '速度超過', sev: 'warn', w: 2, re: /speed|速度超過|スピード/i },
     { key: 'smoking', label: '喫煙', sev: 'info', w: 1, re: /smok|喫煙|たばこ|タバコ/i },
-    { key: 'drinking', label: '飲食', sev: 'info', w: 1, re: /drink|eating|飲食|飲み物/i },
-    { key: 'button', label: '手動録画', sev: 'info', w: 0, re: /button|manual|ボタン|手動/i }
+    { key: 'drinking', label: '食事と飲み物', sev: 'info', w: 1, re: /drink|eating|飲食|飲み物|食事/i },
+    { key: 'button', label: 'ボタン押下', sev: 'info', w: 0, re: /button|manual|ボタン|押下|手動/i }
   ];
+  // カメラ機器の状態の種類（v0.7.0 から集計に入れる。安全スコアには入らない）
+  var CAMERA_STATUS_KEYS = { cover: 1, cabin: 1, roadadj: 1, dismount: 1, camera: 1 };
   var OTHER = { key: 'other', label: 'その他', sev: 'info', w: 1 };
   var TYPE_BY_KEY = {}; TYPES.concat([OTHER]).forEach(function (t) { t.src = 'cam'; TYPE_BY_KEY[t.key] = t; });
   // モービルアイ（ME）の警報：ルール名が「ME」で始まる（例：ME車間警報）か、Mobileye・モービルアイを含むもの。
@@ -81,19 +92,19 @@ geotab.addin.cameraSafety = function () {
   function isMeRule(rule) { return !KNOWN_RULES[rule.id] && ME_RE.test(rule.name || ''); }
   // 映像があるか：カメラ（GO Focus Plus）が検知する警報のルールだけが映像を残す。
   // 車両の機器（GOデバイス）の急ブレーキ・急加速・急ハンドル・速度超過・衝突検知や、モービルアイ（ME）の警報は通常映像なし
-  var VIDEO_RE = /distract|inattent|phone|cell|smok|drink|eating|fatigue|drows|yawn|tailgat|close\s*follow|forward\s*collision|near\s*collision|lane\s*(depart|straddl)|solid\s*lane|rolling\s*stop|no\s*seat\s*belt|defensive|camera\s*button|脇見|わき見|スマホ|携帯|喫煙|飲食|居眠り|あくび|車間|車線|一時停止|カメラ/i;
+  // （v0.7.0：カメラの状態・視線下向き・速度標識も、ビデオイベントの画面に出るカメラの警報として「映像の可能性あり」）
+  var VIDEO_RE = /distract|inattent|phone|cell|smok|drink|eating|fatigue|drows|yawn|tailgat|close\s*follow|forward\s*collision|near\s*collision|lane\s*(depart|straddl)|solid\s*lane|rolling\s*stop|no\s*seat\s*belt|defensive|camera\s*button|cover\s*removed|obstruct|adjust|dismount|look(ing)?\s*down|speed\s*(limit\s*)?sign|脇見|わき見|スマホ|携帯|喫煙|飲食|食事|居眠り|あくび|車間|車線|一時停止|カメラ|カバー|遮断|下向き|標識|押下/i;
   function ruleHasVideo(rule) {
-    if (!rule || KNOWN_RULES[rule.id] || isMeRule(rule) || baseTypeOfRule(rule).key === 'camera') return false;
+    if (!rule || KNOWN_RULES[rule.id] || isMeRule(rule)) return false;
     return VIDEO_RE.test(rule.name || '');
   }
   function hasVideo(e) { return !!(e.media || e.video); }
   function typeOfRule(rule) { var b = baseTypeOfRule(rule); return isMeRule(rule) ? meType(b) : b; }
   function isTarget(rule) {
     var t = baseTypeOfRule(rule);
-    if (t.key === 'camera') return false;
     return !!KNOWN_RULES[rule.id] || t !== OTHER || isMeRule(rule) || CAMERA_RE.test(rule.name || '');
   }
-  var AUTO_VER = 3;   // 自動選択の基準を変えたら上げる（利用者が設定で選んでいない場合は選び直す）
+  var AUTO_VER = 4;   // 自動選択の基準を変えたら上げる（利用者が設定で選んでいない場合は選び直す）
   function load(key, def) { try { var v = JSON.parse(localStorage.getItem(storageKey + ':' + key)); return v == null ? def : v; } catch (e) { return def; } }
   function save(key, v) { try { localStorage.setItem(storageKey + ':' + key, JSON.stringify(v)); } catch (e) { /* ignore */ } }
   // 地図の座標（Webメルカトル、0〜1に正規化）
@@ -126,12 +137,19 @@ geotab.addin.cameraSafety = function () {
         settings.rules = rules.filter(isTarget).map(function (r) { return { id: r.id, name: r.name }; });
         settings.autoVer = AUTO_VER;
         save('settings', settings);
-      } else if ((settings.autoVer || 0) < 3) {
-        // 設定画面で選び直した場合も、v0.5.1で加わったモービルアイ（ME）の警報（ME追突警報など）は1回だけ追加する
+      } else if ((settings.autoVer || 0) < AUTO_VER) {
+        // 設定画面で選び直した場合も、あとから加わった警報は1回だけ追加する
+        //   v0.5.1：モービルアイ（ME）の警報（ME追突警報など）
+        //   v0.7.0：カメラの状態（カバー取り外し・車内遮断・道路調整推奨・ドライブレコーダー取り外し）、視線下向き・速度標識
         var have = {}; settings.rules.forEach(function (r) { have[r.id] = 1; });
-        rules.filter(function (r) { return isMeRule(r) && isTarget(r) && !have[r.id]; })
-          .forEach(function (r) { settings.rules.push({ id: r.id, name: r.name }); });
-        settings.autoVer = 3;
+        var NEW_KEYS = { lookdown: 1, speedsign: 1 };
+        Object.keys(CAMERA_STATUS_KEYS).forEach(function (k) { NEW_KEYS[k] = 1; });
+        rules.filter(function (r) {
+          if (have[r.id] || !isTarget(r)) return false;
+          if ((settings.autoVer || 0) < 3 && isMeRule(r)) return true;
+          return !!NEW_KEYS[baseTypeOfRule(r).key];
+        }).forEach(function (r) { settings.rules.push({ id: r.id, name: r.name }); });
+        settings.autoVer = AUTO_VER;
         save('settings', settings);
       }
       var sel = settings.rules.filter(function (r) { return ruleById[r.id]; });
@@ -366,7 +384,8 @@ geotab.addin.cameraSafety = function () {
     var risk = [0.5, 2.4, 0.8, 0.3, 3.2, 1.0, 1.4, 0.4, 1.9, 0.7, 1.1, 0.6, 2.0, 0.9];
     var favor = [['brake'], ['phone', 'distract'], ['tailgate'], [], ['speed', 'distract', 'brake'], ['lane'], ['accel', 'brake'], [], ['tailgate', 'smoking'], ['corner'], ['seatbelt'], [], ['fatigue', 'lane'], ['stop']];
     var base = ['brake', 'brake', 'accel', 'corner', 'speed', 'speed', 'tailgate', 'lane', 'distract', 'stop', 'seatbelt', 'smoking', 'button', 'drinking',
-      'me_tailgate', 'me_tailgate', 'me_lane', 'me_near'];   // モービルアイ（ME）の警報もデモに含める
+      'me_tailgate', 'me_tailgate', 'me_lane', 'me_near',   // モービルアイ（ME）の警報もデモに含める
+      'yawn', 'lookdown', 'cover', 'cabin'];                 // ビデオ画面と同じ分類（あくび・視線下向き・カメラの状態）
     var events = [], n = 0;
     drvNames.forEach(function (_, di) {
       var vi = di % devNames.length, dev = 'b' + vi, ci = vi % cities.length, myRoutes = routes[vi];
