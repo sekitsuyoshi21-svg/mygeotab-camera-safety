@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.7.0';
+  var VERSION = '0.7.1';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1045,10 +1045,12 @@ geotab.addin.cameraSafety = function () {
       : '<video controls autoplay muted src="' + esc(mediaUrl(e.media)) + '"></video>';
     else if (!hasVideo(e)) v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">この警報には、通常は映像がありません</p>' +
       '<p>' + (e.type.src === 'me' ? 'モービルアイ（ME）が検知した警報' : '車両の機器（GOデバイス）が検知した警報') + 'のため、カメラの映像は残りません。</p>' +
-      (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">念のためMyGeotabのビデオ画面を開く（新しいタブ）</a>' : '') + '</div>';
+      (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl(e)) + '">念のためMyGeotabのビデオ画面を開く（この車両・日付で絞り込み）</a>' : '') + '</div>';
     else v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">カメラが検知した警報です（映像の可能性あり）</p>' +
       '<p>映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
-      (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a><p>' + esc(nameOf('device', e.devId)) + '・' + fmtT(e.t) + ' の映像を探してください</p>'
+      (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl(e)) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a>' +
+        '<p>' + esc(nameOf('device', e.devId)) + (e.drvId !== UNKNOWN_DRIVER ? '・' + esc(nameOf('driver', e.drvId)) : '') + '・' + esc(fmtShort(e.t).replace(/\s*\d{1,2}:\d{2}$/, '')) +
+        ' に絞り込んで開きます。' + esc(fmtT(e.t).slice(-5)) + ' ごろの映像を探してください</p>'
         : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') +
       '<p class="cs-d-novideo-note">※ 同じ種類の警報が短い間隔で続いたとき（クールダウン）や、録画の保存先が「カメラ」の設定、通信状況などによって、映像が保存されていないことがあります。</p></div>';
     // 地図
@@ -1087,8 +1089,30 @@ geotab.addin.cameraSafety = function () {
   // ビデオ画面のアドレス。設定の「#addin-geotabvideo-events,visibleCategoryId:21」を、
   // MyGeotabのアドレス（https://サーバー/データベース/#…）にして新しいタブで開く。
   // （MyGeotabの画面内移動 state.gotoPage では条件の渡し方が合わず、ビデオ画面がエラーになったため）
-  function videoUrl() {
+  // v0.7.1：警報 e を渡すと、その車両・運転手・日付で絞り込んだ状態で開く。
+  //   ビデオ画面のアドレスの形（ユーザーがビデオ画面で絞り込んだときのアドレスから確認）：
+  //   #addin-geotabvideo-events,visibleCategoryId:21,deviceIds:372384,driverIds:59976435659105,
+  //    includeUnassignedDriverEvents:false,from:1795705200000,to:1795791599999
+  //   deviceIds・driverIds は、APIのID（例：b5AEA0）の先頭1文字を除いた16進数を10進数にした番号
+  function geotabNumId(id) {
+    var m = /^[a-z]([0-9a-f]+)$/i.exec(String(id || ''));
+    if (!m) return null;                         // UnknownDriverId などは番号にできない
+    var n = parseInt(m[1], 16);
+    return Number.isSafeInteger(n) ? n : null;
+  }
+  function videoUrl(e) {
     var h = String(settings.videoHash || '').replace(/^.*#/, '').trim();
+    if (e) {
+      // 設定のアドレスから絞り込みの部分を外して、この警報の条件を付け直す
+      var parts = h.split(',').filter(function (p) { return !/^(deviceIds|driverIds|includeUnassignedDriverEvents|from|to):/.test(p); });
+      var dev = geotabNumId(e.devId), drv = e.drvId !== UNKNOWN_DRIVER ? geotabNumId(e.drvId) : null;
+      var from = jstMidnight(+e.t);                // その日の0時〜23時59分（日本時間）
+      if (dev != null) parts.push('deviceIds:' + dev);
+      if (drv != null) parts.push('driverIds:' + drv);
+      parts.push('includeUnassignedDriverEvents:true');   // 運転者が割り当てられていない映像も含める
+      parts.push('from:' + from, 'to:' + (from + DAY - 1));
+      h = parts.join(',');
+    }
     return 'https://' + (server || 'my.geotab.com') + '/' + encodeURIComponent(session ? session.database : '') + '/#' + h;
   }
 
