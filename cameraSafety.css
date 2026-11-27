@@ -296,14 +296,3 @@
 #cameraSafety .cs-list { width: auto; max-width: 100%; }
 #cameraSafety .cs-list th:nth-child(2), #cameraSafety .cs-list td:nth-child(2),
 #cameraSafety .cs-list th:nth-child(3), #cameraSafety .cs-list td:nth-child(3) { padding-right: 20px; }#cameraSafety .cs-list td:last-child { width: auto; }
-
-
-/* ビデオ画面の車両の番号の登録欄（v0.7.5） */
-#cameraSafety .cs-vreg { margin-top: 10px; max-width: 520px; text-align: left; font-size: 13px; color: #e2e8f0; }
-#cameraSafety .cs-vreg summary { cursor: pointer; color: #93c5fd; text-align: center; }
-#cameraSafety .cs-vreg ol { margin: 8px 0; padding-left: 20px; line-height: 1.6; }
-#cameraSafety .cs-vreg-row { display: flex; gap: 6px; }
-#cameraSafety .cs-vreg-row input { flex: 1; min-width: 0; font: inherit; font-size: 13px; padding: 5px 8px; border: 1px solid #94a3b8; border-radius: 6px; color: #111827; background: #fff; }
-#cameraSafety .cs-vreg-msg { color: #fca5a5 !important; font-size: 12px; min-height: 1em; margin: 4px 0 0; }
-#cameraSafety .cs-vreg-ok { font-size: 13px; color: #bbf7d0 !important; }
-#cameraSafety .cs-vreg-ok .cs-link { color: #93c5fd; text-decoration: underline; }

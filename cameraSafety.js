@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.7.5';
+  var VERSION = '0.7.6';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -164,8 +164,8 @@ geotab.addin.cameraSafety = function () {
       sel.forEach(function (r) {
         calls.push(['Get', { typeName: 'ExceptionEvent', search: { ruleSearch: { id: r.id }, fromDate: p.prevFrom.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 50000 }]);
       });
-      return Promise.all([multi(calls), loadMedia(p), loadCameras()]).then(function (res) {
-        var r = res[0], media = res[1], cameras = res[2];
+      return Promise.all([multi(calls), loadMedia(p)]).then(function (res) {
+        var r = res[0], media = res[1];
         var devices = {}, drivers = {}, trips = [], devRaw = {}, devSerial = {};
         r[0].forEach(function (d) { devices[d.id] = d.name || d.id; devRaw[d.id] = (d.groups || []).map(function (g) { return g.id; }); if (d.serialNumber) devSerial[d.serialNumber] = d.id; });
         // 運転手の名前：j21では「名（First name）」の欄に苗字が入っているため、初期設定は「名の欄 → 姓の欄」の順（設定で切替可）
@@ -190,8 +190,7 @@ geotab.addin.cameraSafety = function () {
         attachMedia(events, media);
         var d = build(events, devices, drivers, trips, p);
         setGroups(d, (r[3] || []).map(function (g) { return { id: g.id, name: g.name, children: (g.children || []).map(function (c) { return c.id; }) }; }), devRaw);
-        d.devSerial = devSerial;
-        d.camByDev = cameraMap(cameras, devSerial);   // 車両ID → カメラのシリアル番号
+        d.devSerial = devSerial;   // 接続チェックでカメラと車両を対応させるため
         return d;
       });
     });
@@ -229,7 +228,7 @@ geotab.addin.cameraSafety = function () {
   //    "activeFrom":"…","activeTo":"9999-12-31…","model":"GO Focus Plus","id":"azzAvHizFP0qGf2cpHapaww"}
   //   deviceSerialNumber ＝ 車両（GOデバイス）のシリアル番号 なので、どの車両のカメラかは分かる。
   //   ただし id は番号ではなく、ビデオ画面の番号（例：402911）は API からは分からない。
-  //   → ビデオ画面の番号は、利用者が一度ビデオ画面で車両を選んだときのアドレスから登録してもらう（vidNums）。
+  //   （v0.7.6：ビデオ画面での絞り込みはやめたため、接続チェックの表示だけに使う）
   function cameraMap(cameras, devSerial) {
     var map = {}, now = Date.now();
     (cameras || []).forEach(function (c) {
@@ -238,13 +237,6 @@ geotab.addin.cameraSafety = function () {
       if (devId) map[devId] = c.cameraSerialNumber || c.id;
     });
     return map;
-  }
-  // ビデオ画面の車両の番号（車両ID → 番号）。このPC・ブラウザーに保存
-  var vidNums = {};
-  function parseVideoNum(s) {
-    s = String(s || '').trim();
-    var m = /deviceIds:(\d+)/.exec(s) || /^(\d+)$/.exec(s);
-    return m ? +m[1] : null;
   }
 
   function loadMedia(p) {
@@ -1077,16 +1069,13 @@ geotab.addin.cameraSafety = function () {
       : '<video controls autoplay muted src="' + esc(mediaUrl(e.media)) + '"></video>';
     else if (!hasVideo(e)) v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">この警報には、通常は映像がありません</p>' +
       '<p>' + (e.type.src === 'me' ? 'モービルアイ（ME）が検知した警報' : '車両の機器（GOデバイス）が検知した警報') + 'のため、カメラの映像は残りません。</p>' +
-      (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl(e)) + '">念のためMyGeotabのビデオ画面を開く（この車両・日付で絞り込み）</a>' : '') + '</div>';
+      (settings.videoHash ? '<a class="cs-link cs-d-golink" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">念のためMyGeotabのビデオ画面を開く</a>' : '') + '</div>';
     else v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">カメラが検知した警報です（映像の可能性あり）</p>' +
       '<p>映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
-      (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl(e)) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a>' +
-        '<p>' + (vidNums[e.devId] != null ? esc(nameOf('device', e.devId)) + '・' : '') + esc(fmtShort(e.t).replace(/\s*\d{1,2}:\d{2}$/, '')) +
-        ' に絞り込んで開きます。' + esc(nameOf('device', e.devId)) + 'の ' + esc(fmtT(e.t).slice(-5)) + ' ごろの映像を探してください</p>' +
-        vidRegHtml(e)
+      (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl()) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a>' +
+        '<p>ビデオ画面で <b>' + esc(nameOf('device', e.devId)) + '</b>・<b>' + esc(fmtT(e.t)) + '</b> ごろの映像を探してください</p>'
         : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') +
       '<p class="cs-d-novideo-note">※ 同じ種類の警報が短い間隔で続いたとき（クールダウン）や、録画の保存先が「カメラ」の設定、通信状況などによって、映像が保存されていないことがあります。</p></div>';
-    bindVidReg(e);
     // 地図
     var mp = $('cs-d-map');
     if (e.pos) {
@@ -1123,61 +1112,11 @@ geotab.addin.cameraSafety = function () {
   // ビデオ画面のアドレス。設定の「#addin-geotabvideo-events,visibleCategoryId:21」を、
   // MyGeotabのアドレス（https://サーバー/データベース/#…）にして新しいタブで開く。
   // （MyGeotabの画面内移動 state.gotoPage では条件の渡し方が合わず、ビデオ画面がエラーになったため）
-  // v0.7.1：警報 e を渡すと、その車両・運転手・日付で絞り込んだ状態で開く。
-  //   ビデオ画面のアドレスの形（ユーザーがビデオ画面で絞り込んだときのアドレスから確認）：
-  //   #addin-geotabvideo-events,visibleCategoryId:21,deviceIds:372384,driverIds:59976435659105,
-  //    includeUnassignedDriverEvents:false,from:1795705200000,to:1795791599999
-  //   deviceIds・driverIds は、APIのID（例：b5AEA0）の先頭1文字を除いた16進数を10進数にした番号
-  function geotabNumId(id) {
-    var m = /^[a-z]([0-9a-f]+)$/i.exec(String(id || ''));
-    if (!m) return null;                         // UnknownDriverId などは番号にできない
-    var n = parseInt(m[1], 16);
-    return Number.isSafeInteger(n) ? n : null;
-  }
-  // 詳細画面の「この車両のビデオ画面の番号」の登録欄（v0.7.5）
-  function vidRegHtml(e) {
-    var cam = data && data.camByDev ? data.camByDev[e.devId] : null, num = vidNums[e.devId];
-    var camTxt = cam ? '（カメラのシリアル番号 ' + esc(cam) + '）' : '';
-    if (num != null) return '<p class="cs-vreg-ok">この車両' + camTxt + 'はビデオ画面の番号 ' + num + ' で絞り込みます。 ' +
-      '<button type="button" class="cs-link" id="cs-vreg-del">登録を消す</button></p>';
-    return '<details class="cs-vreg"><summary>この車両でも絞り込めるようにする（1台につき最初の1回だけ）</summary>' +
-      '<ol><li>上のボタンでビデオ画面を開き、「資産またはシリアル」で <b>' + esc(nameOf('device', e.devId)) + '</b>' + camTxt + ' を選ぶ</li>' +
-      '<li>アドレス欄の内容をすべてコピーして、下に貼り付けて「登録」を押す</li></ol>' +
-      '<div class="cs-vreg-row"><input type="text" id="cs-vreg-in" placeholder="https://my.geotab.com/…deviceIds:123456…"> ' +
-      '<button type="button" class="cs-btn" id="cs-vreg-save">登録</button></div><p id="cs-vreg-msg" class="cs-vreg-msg"></p></details>';
-  }
-  function bindVidReg(e) {
-    var s = $('cs-vreg-save'), d = $('cs-vreg-del');
-    if (s) s.onclick = function () {
-      var n = parseVideoNum($('cs-vreg-in').value);
-      if (n == null) { $('cs-vreg-msg').textContent = 'アドレスに「deviceIds:数字」が見つかりません。ビデオ画面で車両を1台だけ選んでからコピーしてください。'; return; }
-      vidNums[e.devId] = n; save('vidNums', vidNums); renderDetail();
-    };
-    if (d) d.onclick = function () { delete vidNums[e.devId]; save('vidNums', vidNums); renderDetail(); };
-  }
-  function videoUrl(e) {
+  // v0.7.6：車両・運転者・日付で絞り込んで開く方法（v0.7.1〜0.7.5）はやめ、ビデオ画面をそのまま開く形に戻した。
+  //   ビデオ画面は車両・運転者にビデオ専用の番号（例：名古屋102あ999 → 372408）を使っており、
+  //   MyGeotab の API から対応を取れず、利用者に1台ずつ登録してもらうのは現実的でないため。
+  function videoUrl() {
     var h = String(settings.videoHash || '').replace(/^.*#/, '').trim();
-    if (e) {
-      // 設定のアドレスから絞り込みの部分を外して、この警報の条件を付け直す
-      // v0.7.4：分類は「全て」（visibleCategoryId:0）にする。21 などの分類のままだと、その分類以外の警報の映像が出ないため
-      //   （何も選んでいない状態のアドレス：#addin-geotabvideo-events,visibleCategoryId:0,includeUnassignedDriverEvents:false,
-      //    from:…,to:…,showDismissed:false）
-      var parts = h.split(',').filter(function (p) { return !/^(visibleCategoryId|deviceIds|driverIds|includeUnassignedDriverEvents|from|to|showDismissed):/.test(p); });
-      parts.push('visibleCategoryId:0');
-      // カメラの番号（Camera の一覧から）。分からない時はカメラの絞り込みを付けない（間違った番号だと何も選ばれないため）
-      // カメラの番号：ビデオ画面のアドレスから登録した番号（vidNums）。未登録ならカメラの絞り込みを付けない（間違った番号だと何も選ばれないため）
-      var dev = vidNums[e.devId] != null ? vidNums[e.devId] : null;
-      // 運転者：ビデオ画面は運転手もビデオ専用の番号（例：59976435659105）を使い、MyGeotab の運転手の番号（例：767）とは違う。
-      // 間違った番号で絞り込むと何も表示されないため、運転者の絞り込みは付けない（v0.7.3）
-      var drv = null;
-      var from = jstMidnight(+e.t);                // その日の0時〜23時59分（日本時間）
-      if (dev != null) parts.push('deviceIds:' + dev);
-      if (drv != null) parts.push('driverIds:' + drv);
-      parts.push('includeUnassignedDriverEvents:true');   // 運転者が割り当てられていない映像も含める
-      parts.push('from:' + from, 'to:' + (from + DAY - 1));
-      parts.push('showDismissed:false');
-      h = parts.join(',');
-    }
     return 'https://' + (server || 'my.geotab.com') + '/' + encodeURIComponent(session ? session.database : '') + '/#' + h;
   }
 
@@ -1391,9 +1330,8 @@ geotab.addin.cameraSafety = function () {
         var map = cameraMap(l, data ? data.devSerial : {});
         line('Camera（カメラの一覧）：' + l.length + '台、うち表示中の車両に付いているもの ' + Object.keys(map).length + '台');
         Object.keys(map).slice(0, 5).forEach(function (devId) {
-          line('  ・' + (data && data.devices[devId] || devId) + ' → カメラ ' + map[devId] + (vidNums[devId] ? '（ビデオ画面の番号 ' + vidNums[devId] + ' 登録済み）' : ''));
+          line('  ・' + (data && data.devices[devId] || devId) + ' → カメラ ' + map[devId]);
         });
-        line('ビデオ画面の番号を登録済みの車両：' + Object.keys(vidNums).length + '台');
       }, function (e) { line('Camera：取得できません（' + (e && e.message || e).toString().slice(0, 120) + '）'); });
     }).then(function () {
       // 運転手の情報の形（ビデオ画面の運転者の番号と対応させる項目を探すため。名前やメールは出さず、項目名と番号だけ）
@@ -1565,7 +1503,6 @@ geotab.addin.cameraSafety = function () {
       // ビデオ画面：Geotab標準のビデオ（GO Focus）画面を初期設定にする（「設定」で変更可）
       if (!settings.videoHash) settings.videoHash = DEFAULT_VIDEO_HASH;
       marks = load('marks', {});
-      vidNums = load('vidNums', {}) || {};   // ビデオ画面の車両の番号（v0.7.5）
       var d = load('days', null); if (d) $('cs-days').value = d;
       savedGroup = load('group', '') || null;
       var ts = load('types', []); view.types = Array.isArray(ts) ? ts.filter(function (k) { return TYPE_BY_KEY[k]; }) : [];
