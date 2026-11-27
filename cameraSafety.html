@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ヒートマップダッシュボード</title>
-  <link rel="stylesheet" href="cameraSafety.css?v=0.6.6">
+  <link rel="stylesheet" href="cameraSafety.css?v=0.6.7">
 </head>
 <body>
 <div id="cameraSafety">
@@ -111,6 +111,7 @@
         <div class="cs-row cs-list-tools">
           <label class="cs-check"><input type="checkbox" id="cs-only-todo"> 未確認だけ</label>
           <label class="cs-check" title="カメラが検知した警報（映像が残っている可能性があるもの）だけを表示"><input type="checkbox" id="cs-only-video"> カメラの警報だけ</label>
+          <label class="cs-check" title="チェックを外すと、モービルアイ（ME）の警報を一覧に出しません"><input type="checkbox" id="cs-show-me" checked> MEの警報を表示</label>
           <input type="search" id="cs-filter" placeholder="名前・車両で検索">
         </div>
         <p class="cs-muted cs-note">行をクリックすると地図でその場所を表示。<span class="cs-video-btn cs-legend-btn">▶</span>＝映像の可能性あり（カメラの警報。設定によっては保存されていないこともあります）、<span class="cs-video-btn none cs-legend-btn">詳細</span>＝映像なし（車両の機器・MEの警報）。</p>
@@ -230,6 +231,6 @@
     </div>
   </div>
 </div>
-<script src="cameraSafety.js?v=0.6.6"></script>
+<script src="cameraSafety.js?v=0.6.7"></script>
 </body>
 </html>

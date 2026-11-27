@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.6.6';
+  var VERSION = '0.6.7';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -59,7 +59,7 @@ geotab.addin.cameraSafety = function () {
   var DEFAULT_VIDEO_HASH = '#addin-geotabvideo-events,visibleCategoryId:21';
   var marks = {};                                   // 確認済み・メモ { eventId: {ack, memo} }
   var data = null, loading = false;
-  var view = { rankBy: 'driver', onlyTodo: false, types: [] };   // types：アラートの複数選択（空＝すべて）
+  var view = { rankBy: 'driver', onlyTodo: false, types: [], showMe: true };   // types：アラートの複数選択（空＝すべて）／showMe：警報一覧にMEの警報を出すか
   var listRows = [], detailList = [], detailIdx = -1;
   var $ = function (id) { return document.getElementById(id); };
 
@@ -473,6 +473,7 @@ geotab.addin.cameraSafety = function () {
       if (!opts.noType && !typeOk(e, c.types)) return false;
       if (opts.list && view.onlyTodo && (marks[e.id] || {}).ack) return false;
       if (opts.list && view.onlyVideo && !hasVideo(e)) return false;
+      if (opts.list && !view.showMe && e.type.src === 'me') return false;   // 「MEの警報を表示」を外したとき
       if (q && (nameOf('driver', e.drvId) + ' ' + nameOf('device', e.devId)).indexOf(q) < 0) return false;
       return true;
     });
@@ -1310,6 +1311,7 @@ geotab.addin.cameraSafety = function () {
     $('cs-filter').oninput = function () { if (data) renderList(); };
     $('cs-only-todo').onchange = function () { view.onlyTodo = this.checked; if (data) renderList(); };
     $('cs-only-video').onchange = function () { view.onlyVideo = this.checked; if (data) renderList(); };
+    $('cs-show-me').onchange = function () { view.showMe = this.checked; save('showMe', view.showMe); if (data) renderList(); };
     $('cs-csv').onclick = exportCsv;
     $('cs-types').onclick = function (e) { var b = e.target.closest('[data-type]'); if (b) toggleType(b.dataset.type); };
     $('cs-rank-by').onclick = function (e) {
@@ -1441,6 +1443,7 @@ geotab.addin.cameraSafety = function () {
       var ts = load('types', []); view.types = Array.isArray(ts) ? ts.filter(function (k) { return TYPE_BY_KEY[k]; }) : [];
       var ly = load('layers', null); if (ly) { $('l-tracks').checked = ly.tracks !== false; $('l-heat').checked = ly.heat !== false; $('l-points').checked = !!ly.points; }
       var sw = load('sideW', null); if (sw) setSideWidth(sw, false);   // 前回の左の列の幅
+      view.showMe = load('showMe', true) !== false; $('cs-show-me').checked = view.showMe;   // 前回の「MEの警報を表示」
       if (!bound) { bind(); bound = true; }
       fitHeight();
     });
