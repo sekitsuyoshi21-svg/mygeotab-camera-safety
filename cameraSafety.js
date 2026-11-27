@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.7.2';
+  var VERSION = '0.7.4';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1082,8 +1082,8 @@ geotab.addin.cameraSafety = function () {
     else v.innerHTML = '<div class="cs-d-novideo"><p class="cs-d-novideo-title">カメラが検知した警報です（映像の可能性あり）</p>' +
       '<p>映像は、MyGeotabの「ビデオ」画面で確認できます。</p>' +
       (settings.videoHash ? '<a class="cs-btn" id="cs-d-goto" target="_blank" rel="noopener" href="' + esc(videoUrl(e)) + '">MyGeotabのビデオ画面を開く（新しいタブ）</a>' +
-        '<p>' + esc(nameOf('device', e.devId)) + (e.drvId !== UNKNOWN_DRIVER ? '・' + esc(nameOf('driver', e.drvId)) : '') + '・' + esc(fmtShort(e.t).replace(/\s*\d{1,2}:\d{2}$/, '')) +
-        ' に絞り込んで開きます。' + esc(fmtT(e.t).slice(-5)) + ' ごろの映像を探してください</p>'
+        '<p>' + (data && data.camByDev && data.camByDev[e.devId] != null ? esc(nameOf('device', e.devId)) + '・' : '') + esc(fmtShort(e.t).replace(/\s*\d{1,2}:\d{2}$/, '')) +
+        ' に絞り込んで開きます。' + esc(nameOf('device', e.devId)) + 'の ' + esc(fmtT(e.t).slice(-5)) + ' ごろの映像を探してください</p>'
         : '<p>「設定 → 映像を開くページ」にビデオ画面のアドレスを登録すると、ここから開けます。</p>') +
       '<p class="cs-d-novideo-note">※ 同じ種類の警報が短い間隔で続いたとき（クールダウン）や、録画の保存先が「カメラ」の設定、通信状況などによって、映像が保存されていないことがあります。</p></div>';
     // 地図
@@ -1137,15 +1137,22 @@ geotab.addin.cameraSafety = function () {
     var h = String(settings.videoHash || '').replace(/^.*#/, '').trim();
     if (e) {
       // 設定のアドレスから絞り込みの部分を外して、この警報の条件を付け直す
-      var parts = h.split(',').filter(function (p) { return !/^(deviceIds|driverIds|includeUnassignedDriverEvents|from|to):/.test(p); });
+      // v0.7.4：分類は「全て」（visibleCategoryId:0）にする。21 などの分類のままだと、その分類以外の警報の映像が出ないため
+      //   （何も選んでいない状態のアドレス：#addin-geotabvideo-events,visibleCategoryId:0,includeUnassignedDriverEvents:false,
+      //    from:…,to:…,showDismissed:false）
+      var parts = h.split(',').filter(function (p) { return !/^(visibleCategoryId|deviceIds|driverIds|includeUnassignedDriverEvents|from|to|showDismissed):/.test(p); });
+      parts.push('visibleCategoryId:0');
       // カメラの番号（Camera の一覧から）。分からない時はカメラの絞り込みを付けない（間違った番号だと何も選ばれないため）
       var dev = data && data.camByDev && data.camByDev[e.devId] != null ? data.camByDev[e.devId] : (demo ? geotabNumId(e.devId) : null);
-      var drv = e.drvId !== UNKNOWN_DRIVER ? geotabNumId(e.drvId) : null;
+      // 運転者：ビデオ画面は運転手もビデオ専用の番号（例：59976435659105）を使い、MyGeotab の運転手の番号（例：767）とは違う。
+      // 間違った番号で絞り込むと何も表示されないため、運転者の絞り込みは付けない（v0.7.3）
+      var drv = null;
       var from = jstMidnight(+e.t);                // その日の0時〜23時59分（日本時間）
       if (dev != null) parts.push('deviceIds:' + dev);
       if (drv != null) parts.push('driverIds:' + drv);
       parts.push('includeUnassignedDriverEvents:true');   // 運転者が割り当てられていない映像も含める
       parts.push('from:' + from, 'to:' + (from + DAY - 1));
+      parts.push('showDismissed:false');
       h = parts.join(',');
     }
     return 'https://' + (server || 'my.geotab.com') + '/' + encodeURIComponent(session ? session.database : '') + '/#' + h;
@@ -1365,6 +1372,14 @@ geotab.addin.cameraSafety = function () {
           line('  ・' + (data && data.devices[devId] || devId) + '（車両 ' + devId + '）→ ビデオ画面の番号 ' + map[devId]);
         });
       }, function (e) { line('Camera：取得できません（' + (e && e.message || e).toString().slice(0, 120) + '）'); });
+    }).then(function () {
+      // 運転手の情報の形（ビデオ画面の運転者の番号と対応させる項目を探すため。名前やメールは出さず、項目名と番号だけ）
+      return call('Get', { typeName: 'User', search: { isDriver: true }, resultsLimit: 1 }).then(function (l) {
+        var u = (l || [])[0];
+        if (!u) { line('User（運転手）：0件'); return; }
+        line('User（運転手）の項目：' + Object.keys(u).join(', '));
+        line('  例の番号：id=' + u.id + (u.employeeNo ? '／employeeNo=' + u.employeeNo : '') + (u.keys ? '／keys=' + JSON.stringify(u.keys).slice(0, 200) : ''));
+      }, function (e) { line('User：取得できません（' + (e && e.message || e).toString().slice(0, 120) + '）'); });
     }).then(function () { line('\n確認が終わりました。この内容をコピーして開発担当に送ってください。'); });
   }
 
