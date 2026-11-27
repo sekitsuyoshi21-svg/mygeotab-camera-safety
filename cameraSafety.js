@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.7.6';
+  var VERSION = '0.7.7';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -1101,13 +1101,37 @@ geotab.addin.cameraSafety = function () {
     addrCache[key] = null;
     call('GetAddresses', { coordinates: [{ x: pos.lon, y: pos.lat }] }).then(function (r) {
       // 住所の先頭・末尾の「日本」と郵便番号を省く（例：「日本、愛知県名古屋市…」→「愛知県名古屋市…」）
-      var a = r && r[0]; addrCache[key] = a ? String(a.formattedAddress || '').replace(/^\s*(日本|Japan)\s*[、,]?\s*/i, '').replace(/,?\s*(Japan|日本)\s*$/i, '').replace(/〒?\s*\d{3}-\d{4}\s*/, '').trim() : '';
+      addrCache[key] = cleanAddr(r && r[0]);
     }, function () { addrCache[key] = ''; }).then(function () {
       if (detailIdx >= 0) renderDetail();
       if (hm.tipP) updateTip(hm.tipP);   // 吹き出しの「住所を取得中…」を住所に置き換える
       clearTimeout(hotTimer); hotTimer = setTimeout(renderHotspots, 100);
     });
     return null;
+  }
+  function cleanAddr(a) {
+    return a ? String(a.formattedAddress || '').replace(/^\s*(日本|Japan)\s*[、,]?\s*/i, '').replace(/,?\s*(Japan|日本)\s*$/i, '').replace(/〒?\s*\d{3}-\d{4}\s*/, '').trim() : '';
+  }
+  // 住所をまとめて取得（CSV用・v0.7.7）。GetAddresses に200地点ずつ渡す。取れた住所は addrCache に入る
+  function loadAddresses(list, onProgress) {
+    var todo = [], seen = {};
+    list.forEach(function (e) {
+      if (!e.pos) return;
+      var key = e.pos.lat.toFixed(4) + ',' + e.pos.lon.toFixed(4);
+      if (addrCache[key] || seen[key]) return;
+      if (demo) { addressOf(e.pos); return; }
+      seen[key] = true; todo.push({ key: key, x: e.pos.lon, y: e.pos.lat });
+    });
+    var CH = 200, i = 0;
+    function next() {
+      if (i >= todo.length) return Promise.resolve();
+      var part = todo.slice(i, i + CH); i += CH;
+      if (onProgress) onProgress(Math.min(i, todo.length), todo.length);
+      return call('GetAddresses', { coordinates: part.map(function (p) { return { x: p.x, y: p.y }; }) }).then(function (r) {
+        part.forEach(function (p, k) { addrCache[p.key] = cleanAddr(r && r[k]); });
+      }, function () { part.forEach(function (p) { if (!addrCache[p.key]) addrCache[p.key] = ''; }); }).then(next);
+    }
+    return next();
   }
   // ビデオ画面のアドレス。設定の「#addin-geotabvideo-events,visibleCategoryId:21」を、
   // MyGeotabのアドレス（https://サーバー/データベース/#…）にして新しいタブで開く。
@@ -1142,12 +1166,24 @@ geotab.addin.cameraSafety = function () {
   }
 
   // ---------- CSV ----------
+  // v0.7.7：緯度・経度の代わりに、緯度・経度から求めた住所を出す
+  var csvBusy = false;
   function exportCsv() {
-    var rows = [['日時', '種類', 'ルール名', '映像', '運転手', '車両', '速度(km/h)', '緯度', '経度', '確認済み', 'メモ']];
-    listRows.forEach(function (e) {
+    if (csvBusy) return;
+    var list = listRows.slice(), btn = $('cs-csv'), label = btn.textContent;
+    csvBusy = true; btn.disabled = true; btn.textContent = '住所を取得中…';
+    loadAddresses(list, function (n, all) { btn.textContent = '住所を取得中… ' + n + '/' + all; }).then(function () {
+      writeCsv(list);
+    }).then(function () { csvBusy = false; btn.disabled = false; btn.textContent = label; },
+      function (err) { csvBusy = false; btn.disabled = false; btn.textContent = label; showMsg('CSVを作れませんでした：' + (err && err.message || err)); });
+  }
+  function writeCsv(list) {
+    var rows = [['日時', '種類', 'ルール名', '映像', '運転手', '車両', '速度(km/h)', '住所', '確認済み', 'メモ']];
+    list.forEach(function (e) {
       var m = marks[e.id] || {};
+      var addr = e.pos ? (addrCache[e.pos.lat.toFixed(4) + ',' + e.pos.lon.toFixed(4)] || '') : '';
       rows.push([fmtT(e.t), e.type.label, e.ruleName, hasVideo(e) ? '可能性あり（カメラ）' : 'なし', nameOf('driver', e.drvId), nameOf('device', e.devId),
-        e.pos ? Math.round(e.pos.spd) : '', e.pos ? e.pos.lat : '', e.pos ? e.pos.lon : '', m.ack ? '済' : '', m.memo || '']);
+        e.pos ? Math.round(e.pos.spd) : '', addr, m.ack ? '済' : '', m.memo || '']);
     });
     var csv = '﻿' + rows.map(function (r) { return r.map(function (c) { return '"' + String(c).replace(/"/g, '""') + '"'; }).join(','); }).join('\r\n');
     var a = document.createElement('a');
