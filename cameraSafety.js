@@ -11,7 +11,7 @@ geotab.addin = geotab.addin || {};
 geotab.addin.cameraSafety = function () {
   'use strict';
 
-  var VERSION = '0.7.1';
+  var VERSION = '0.7.2';
 
   // 警報の種類。ルール名（日本語・英語）から判定する。上から順に判定。
   // sev: crit=重大 / warn=注意 / info=その他、w: 安全スコアの重み（0はスコアに影響しない）
@@ -164,8 +164,8 @@ geotab.addin.cameraSafety = function () {
       sel.forEach(function (r) {
         calls.push(['Get', { typeName: 'ExceptionEvent', search: { ruleSearch: { id: r.id }, fromDate: p.prevFrom.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 50000 }]);
       });
-      return Promise.all([multi(calls), loadMedia(p)]).then(function (res) {
-        var r = res[0], media = res[1];
+      return Promise.all([multi(calls), loadMedia(p), loadCameras()]).then(function (res) {
+        var r = res[0], media = res[1], cameras = res[2];
         var devices = {}, drivers = {}, trips = [], devRaw = {};
         r[0].forEach(function (d) { devices[d.id] = d.name || d.id; devRaw[d.id] = (d.groups || []).map(function (g) { return g.id; }); });
         // 運転手の名前：j21では「名（First name）」の欄に苗字が入っているため、初期設定は「名の欄 → 姓の欄」の順（設定で切替可）
@@ -190,6 +190,7 @@ geotab.addin.cameraSafety = function () {
         attachMedia(events, media);
         var d = build(events, devices, drivers, trips, p);
         setGroups(d, (r[3] || []).map(function (g) { return { id: g.id, name: g.name, children: (g.children || []).map(function (c) { return c.id; }) }; }), devRaw);
+        d.camByDev = cameraMap(cameras, devices);   // 車両ID → ビデオ画面で使うカメラの番号
         return d;
       });
     });
@@ -215,6 +216,38 @@ geotab.addin.cameraSafety = function () {
   }
 
   // MediaFile（映像ファイル）。GO Focus Plusでは使われないことが多いため、取れなくても続行する。
+  // ---------- カメラ（GO Focus Plus）の一覧（v0.7.2） ----------
+  // ビデオ画面の「カメラ」の絞り込み（deviceIds）は、車両（GOデバイス）の番号ではなく、カメラ自体の番号を使う。
+  //  例：八王子100あ7769 → 車両の番号 672（b2A0）／ビデオ画面の番号 402911
+  // そのため MyGeotab の Camera の一覧を読み、どの車両に付いているカメラかを対応させる。取れなくても続行する。
+  function loadCameras() {
+    return call('Get', { typeName: 'Camera' }).then(function (l) { return l || []; }, function () { return []; });
+  }
+  // Geotab の ID（例：b625DF）や数字を、ビデオ画面のアドレスで使う番号（例：402911）に
+  function videoNum(v) {
+    if (v == null) return null;
+    if (typeof v === 'number') return Number.isSafeInteger(v) ? v : null;
+    var s = String(v).trim();
+    if (/^\d+$/.test(s)) return +s;
+    return geotabNumId(s);
+  }
+  // カメラが付いている車両の ID（API の項目名が分からないため、ありそうな項目を順に見る）
+  function cameraDeviceId(c) {
+    var ref = c.device || c.currentDevice || c.assignedDevice || c.vehicle || c.asset || (c.devices && c.devices[0]) || c.deviceId || c.assetId;
+    return ref ? (typeof ref === 'string' ? ref : ref.id) : null;
+  }
+  function cameraMap(cameras, devices) {
+    var map = {}, byName = {};
+    Object.keys(devices || {}).forEach(function (id) { byName[devices[id]] = id; });
+    (cameras || []).forEach(function (c) {
+      var num = videoNum(c.id); if (num == null) return;
+      var devId = cameraDeviceId(c);
+      if (!devId && c.name && byName[c.name]) devId = byName[c.name];   // 車両と同じ名前のカメラ
+      if (devId) map[devId] = num;
+    });
+    return map;
+  }
+
   function loadMedia(p) {
     return call('Get', { typeName: 'MediaFile', search: { fromDate: p.from.toISOString(), toDate: p.to.toISOString() }, resultsLimit: 5000 })
       .then(function (l) { return (l || []).filter(function (m) { return m.device && (!m.status || m.status === 'Ready'); }); }, function () { return []; });
@@ -1105,7 +1138,9 @@ geotab.addin.cameraSafety = function () {
     if (e) {
       // 設定のアドレスから絞り込みの部分を外して、この警報の条件を付け直す
       var parts = h.split(',').filter(function (p) { return !/^(deviceIds|driverIds|includeUnassignedDriverEvents|from|to):/.test(p); });
-      var dev = geotabNumId(e.devId), drv = e.drvId !== UNKNOWN_DRIVER ? geotabNumId(e.drvId) : null;
+      // カメラの番号（Camera の一覧から）。分からない時はカメラの絞り込みを付けない（間違った番号だと何も選ばれないため）
+      var dev = data && data.camByDev && data.camByDev[e.devId] != null ? data.camByDev[e.devId] : (demo ? geotabNumId(e.devId) : null);
+      var drv = e.drvId !== UNKNOWN_DRIVER ? geotabNumId(e.drvId) : null;
       var from = jstMidnight(+e.t);                // その日の0時〜23時59分（日本時間）
       if (dev != null) parts.push('deviceIds:' + dev);
       if (drv != null) parts.push('driverIds:' + drv);
@@ -1319,6 +1354,17 @@ geotab.addin.cameraSafety = function () {
       return call('Get', { typeName: 'CameraEvent', search: { fromDate: from.toISOString(), toDate: to.toISOString() }, resultsLimit: 5 })
         .then(function (l) { line('CameraEvent（直近7日）：' + l.length + '件' + (l[0] ? '\n  例：' + JSON.stringify(l[0]).slice(0, 400) : '')); },
           function (e) { line('CameraEvent：この方法では取得できません（' + (e && e.message || e).toString().slice(0, 120) + '）'); });
+    }).then(function () {
+      // カメラの一覧（ビデオ画面を車両で絞り込んで開くために使う）
+      return call('Get', { typeName: 'Camera' }).then(function (l) {
+        l = l || [];
+        var map = cameraMap(l, data ? data.devices : {});
+        line('Camera（カメラの一覧）：' + l.length + '台、うち車両との対応が分かったもの ' + Object.keys(map).length + '台');
+        l.slice(0, 2).forEach(function (c) { line('  例：' + JSON.stringify(c).slice(0, 500)); });
+        Object.keys(map).slice(0, 5).forEach(function (devId) {
+          line('  ・' + (data && data.devices[devId] || devId) + '（車両 ' + devId + '）→ ビデオ画面の番号 ' + map[devId]);
+        });
+      }, function (e) { line('Camera：取得できません（' + (e && e.message || e).toString().slice(0, 120) + '）'); });
     }).then(function () { line('\n確認が終わりました。この内容をコピーして開発担当に送ってください。'); });
   }
 
